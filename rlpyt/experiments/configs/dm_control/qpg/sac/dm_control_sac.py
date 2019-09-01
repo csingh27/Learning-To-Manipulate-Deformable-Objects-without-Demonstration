@@ -37,11 +37,13 @@ config = dict(
         domain='cloth_v0',
         task='easy',
         max_path_length=1200,
+        task_kwargs=dict(reward='diagonal')
     ),
     eval_env=dict(
         domain='cloth_v0',
         task='easy',
         max_path_length=1200,
+        task_kwargs=dict(reward='diagonal')
     )
 )
 
