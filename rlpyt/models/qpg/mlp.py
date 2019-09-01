@@ -18,8 +18,9 @@ class MuMlpModel(torch.nn.Module):
         super().__init__()
         self._output_max = output_max
         self._obs_ndim = len(observation_shape)
+        input_dim = int(np.prod(observation_shape))
         self.mlp = MlpModel(
-            input_size=int(np.prod(observation_shape)),
+            input_size=input_dim,
             hidden_sizes=hidden_sizes,
             output_size=action_size,
         )
@@ -40,15 +41,23 @@ class PiMlpModel(torch.nn.Module):
             action_size,
             ):
         super().__init__()
-        self._obs_ndim = len(observation_shape)
+        if True:
+            self._obs_ndim = 1
+            input_dim = int(np.sum(observation_shape))
+        else:
+            self._obs_ndim = len(observation_shape)
+            input_dim = int(np.prod(observation_shape))
         self._action_size = action_size
         self.mlp = MlpModel(
-            input_size=int(np.prod(observation_shape)),
+            input_size=input_dim,
             hidden_sizes=hidden_sizes,
             output_size=action_size * 2,
         )
 
     def forward(self, observation, prev_action, prev_reward):
+        if isinstance(observation, tuple):
+            observation = torch.cat(observation, dim=-1)
+
         lead_dim, T, B, _ = infer_leading_dims(observation,
             self._obs_ndim)
         output = self.mlp(observation.view(T * B, -1))
@@ -66,14 +75,23 @@ class QofMuMlpModel(torch.nn.Module):
             action_size,
             ):
         super().__init__()
-        self._obs_ndim = len(observation_shape)
+        if True:
+            self._obs_ndim = 1
+            input_dim = int(np.sum(observation_shape))
+        else:
+            self._obs_ndim = len(observation_shape)
+            input_dim = int(np.prod(observation_shape))
+        input_dim += action_size
         self.mlp = MlpModel(
-            input_size=int(np.prod(observation_shape)) + action_size,
+            input_size=input_dim,
             hidden_sizes=hidden_sizes,
             output_size=1,
         )
 
     def forward(self, observation, prev_action, prev_reward, action):
+        if isinstance(observation, tuple):
+            observation = torch.cat(observation, dim=-1)
+
         lead_dim, T, B, _ = infer_leading_dims(observation,
             self._obs_ndim)
         q_input = torch.cat(
@@ -92,14 +110,22 @@ class VMlpModel(torch.nn.Module):
             action_size=None,  # Unused but accept kwarg.
             ):
         super().__init__()
-        self._obs_ndim = len(observation_shape)
+        if True:
+            self._obs_ndim = 1
+            input_dim = int(np.sum(observation_shape))
+        else:
+            self._obs_ndim = len(observation_shape)
+            input_dim = int(np.prod(observation_shape))
         self.mlp = MlpModel(
-            input_size=int(np.prod(observation_shape)),
+            input_size=input_dim,
             hidden_sizes=hidden_sizes,
             output_size=1,
         )
 
     def forward(self, observation, prev_action, prev_reward):
+        if isinstance(observation, tuple):
+            observation = torch.cat(observation, dim=-1)
+
         lead_dim, T, B, _ = infer_leading_dims(observation,
             self._obs_ndim)
         v = self.mlp(observation.view(T * B, -1)).squeeze(-1)
