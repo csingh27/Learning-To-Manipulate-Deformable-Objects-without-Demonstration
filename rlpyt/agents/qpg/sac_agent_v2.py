@@ -7,6 +7,7 @@ from torch.nn.parallel import DistributedDataParallelCPU as DDPC
 
 from rlpyt.agents.base import BaseAgent, AgentStep
 from rlpyt.models.qpg.mlp import QofMuMlpModel, PiMlpModel
+from rlpyt.models.qpg.conv2d import QofMuConvModel, PiConvModel
 from rlpyt.utils.quick_args import save__init__args
 from rlpyt.distributions.gaussian import Gaussian, DistInfoStd
 from rlpyt.utils.buffer import buffer_to
@@ -36,6 +37,11 @@ class SacAgent(BaseAgent):
             action_squash=1,  # Max magnitude (or None).
             pretrain_std=0.75,  # High value to make near uniform sampling.
             ):
+        if ModelCls is not None:
+            ModelCls = eval(ModelCls)
+        if QModelCls is not None:
+            QModelCls = eval(QModelCls)
+
         if model_kwargs is None:
             model_kwargs = dict(hidden_sizes=[256, 256])
         if q_model_kwargs is None:
