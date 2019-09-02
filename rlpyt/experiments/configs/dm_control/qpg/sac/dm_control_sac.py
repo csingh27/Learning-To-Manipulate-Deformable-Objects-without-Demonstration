@@ -62,12 +62,13 @@ config = dict(
         learning_rate=3e-4,
         reparameterize=True,
         policy_output_regularization=0.0,
-        reward_scale=1
+        reward_scale=1,
+        replay_ratio=256,
     ),
     model=dict(),
     optim=dict(),
     runner=dict(
-        n_steps=1e6,
+        n_steps=5e5,
         log_interval_steps=1e4,
     ),
     sampler=dict(

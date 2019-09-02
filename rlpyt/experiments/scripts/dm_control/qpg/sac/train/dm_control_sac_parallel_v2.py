@@ -2,7 +2,7 @@
 import sys
 
 from rlpyt.utils.launching.affinity import affinity_from_code
-from rlpyt.samplers.parallel.gpu.alternating_sampler import AlternatingSampler
+from rlpyt.samplers.parallel.cpu.sampler import CpuSampler
 from rlpyt.samplers.parallel.cpu.collectors import CpuResetCollector
 from rlpyt.envs.dm_control_env import DMControlEnv
 from rlpyt.algos.qpg.sac_v2 import SAC
@@ -21,7 +21,7 @@ def build_and_train(slot_affinity_code, log_dir, run_ID, config_key):
     print('Variant', variant)
     config = update_config(config, variant)
 
-    sampler = AlternatingSampler(
+    sampler = CpuSampler(
         EnvCls=DMControlEnv,
         env_kwargs=config["env"],
         CollectorCls=CpuResetCollector,
