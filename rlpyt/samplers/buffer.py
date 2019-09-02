@@ -13,6 +13,12 @@ def build_samples_buffer(agent, env, batch_spec, bootstrap_value=False,
     """Recommended to step/reset agent and env in subprocess, so it doesn't
     affect settings in master before forking workers (e.g. torch num_threads
     (MKL) may be set at first forward computation.)"""
+
+    # Call reset once to generate the necessary Observation namedtuple
+    # or else pickling will fail when calling on a separate process
+    env.reset()
+    env.step(env.action_space.sample())
+
     if examples is None:
         if subprocess:
             mgr = mp.Manager()
