@@ -19,7 +19,7 @@ MIN_LOG_STD = -20
 MAX_LOG_STD = 2
 
 AgentInfo = namedarraytuple("AgentInfo", ["dist_info"])
-Models = namedtuple("Models", ["pi", "q1", "q2", "v"])
+Models = namedtuple("Models", ["pi", "q1", "q2"])
 
 
 class SacAgent(BaseAgent):
@@ -45,7 +45,7 @@ class SacAgent(BaseAgent):
         save__init__args(locals())
         self.min_itr_learn = 0  # Get from algo.
 
-        self.log_alpha = nn.Parameter(torch.tensor(0.0, dtype=torch.float32))
+        self.log_alpha = None
 
     def initialize(self, env_spaces, share_memory=False,
             global_B=1, env_ranks=None):
@@ -61,6 +61,8 @@ class SacAgent(BaseAgent):
         self.target_q2_model = self.QModelCls(**self.env_model_kwargs, **self.q_model_kwargs)
         self.target_q1_model.load_state_dict(self.q1_model.state_dict())
         self.target_q2_model.load_state_dict(self.q2_model.state_dict())
+
+        self.log_alpha = nn.Parameter(torch.tensor(0.0, dtype=torch.float32))
 
         if self.initial_model_state_dict is not None:
             self.load_state_dict(self.initial_model_state_dict)
@@ -148,7 +150,7 @@ class SacAgent(BaseAgent):
 
     @property
     def models(self):
-        return self.model, self.q1_model, self.q2_model
+        return Models(pi=self.model, q1=self.q1_model, q2=self.q2_model)
 
     def parameters(self):
         for model in self.models:
