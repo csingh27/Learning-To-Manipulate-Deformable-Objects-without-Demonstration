@@ -20,7 +20,7 @@ def main():
     snapshot_file = join(args.snapshot_dir, 'params.pkl')
     config_file = join(args.snapshot_dir, 'params.json')
 
-    params = torch.load(snapshot_file)
+    params = torch.load(snapshot_file, map_location='cpu')
     with open(config_file, 'r') as f:
         config = json.load(f)
 
