@@ -9,7 +9,7 @@ import numpy as np
 from rlpyt.envs.dm_control_env import DMControlEnv
 from rlpyt.agents.qpg.sac_agent_v2 import SacAgent
 from rlpyt.samplers.parallel.cpu.collectors import CpuResetCollector
-from rlpyt.samplers.serial.sampler import SerialSampler
+from rlpyt.samplers.parallel.cpu.sampler import CpuSampler
 
 
 def main():
@@ -35,7 +35,7 @@ def main():
     agent.initialize(dummy_env.spaces)
     agent.load_state_dict(agent_state_dict)
 
-    sampler = SerialSampler(
+    sampler = CpuSampler(
         EnvCls=DMControlEnv,
         env_kwargs=config["env"],
         CollectorCls=CpuResetCollector,
@@ -45,6 +45,8 @@ def main():
     sampler.initialize(agent)
 
     agent.to_device(cuda_idx=0)
+    agent.eval_mode(0)
+
     traj_infos = sampler.evaluate_agent(0, include_observations=True)
     returns = [traj_info.Return for traj_info in traj_infos]
     lengths = [traj_info.Length for traj_info in traj_infos]
