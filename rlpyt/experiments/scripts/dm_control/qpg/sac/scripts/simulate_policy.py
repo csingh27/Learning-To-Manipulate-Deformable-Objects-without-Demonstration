@@ -8,7 +8,7 @@ import numpy as np
 
 from rlpyt.envs.dm_control_env import DMControlEnv
 from rlpyt.agents.qpg.sac_agent_v2 import SacAgent
-from rlpyt.samplers.parallel.cpu.sampler import SerialSampler
+from rlpyt.samplers.serial.sampler import SerialSampler
 
 
 def main():
@@ -19,7 +19,7 @@ def main():
     snapshot_file = join(args.snapshot_dir, 'params.pkl')
     config_file = join(args.snapshot_dir, 'params.json')
 
-    params = torch.load(snapshot_file)
+    params = torch.load(snapshot_file, map_location='cpu')
     with open(config_file, 'r') as f:
         config = json.load(f)
 
@@ -30,10 +30,6 @@ def main():
     optimizer_state_dict = params['optimizer_state_dict']
 
     agent = SacAgent(**config["agent"])
-    dummy_env = DMControlEnv(**config["env"])
-    agent.initialize(dummy_env.spaces)
-    agent.load_state_dict(agent_state_dict)
-
     sampler = SerialSampler(
         EnvCls=DMControlEnv,
         env_kwargs=config["env"],
@@ -41,6 +37,7 @@ def main():
         **config["sampler"]
     )
     sampler.initialize(agent)
+    agent.load_state_dict(agent_state_dict)
 
     agent.to_device(cuda_idx=0)
     agent.eval_mode(0)
