@@ -6,6 +6,7 @@ def get_preprocessor(type):
         def image_preprocess(x):
             x /= 255 # to [0, 1]
             x = 2 * x - 1 # to [-1, 1]
+            return x
         return image_preprocess
     else:
         raise ValueError(type)

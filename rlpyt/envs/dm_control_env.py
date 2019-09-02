@@ -168,7 +168,7 @@ class DMControlEnv(Env):
 
     def _filter_observation(self, observation):
         observation = type(observation)([
-            (name, np.transpose(value, (2, 0, 1)))
+            (name, np.transpose(value, (2, 0, 1)).astype('float32'))
             if name == 'pixels' else (name, value)
             for name, value in observation.items()
             if name in self._observation_keys

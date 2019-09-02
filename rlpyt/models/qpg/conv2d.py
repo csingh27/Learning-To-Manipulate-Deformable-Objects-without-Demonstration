@@ -11,7 +11,7 @@ class PiConvModel(torch.nn.Module):
 
     def __init__(
             self,
-            image_shape,
+            observation_shape,
             channels,
             kernel_sizes,
             strides,
@@ -27,10 +27,11 @@ class PiConvModel(torch.nn.Module):
 
         self._obs_ndim = 3
         self._action_size = action_size
+        self._image_shape = observation_shape.pixels
 
         self.preprocessor = get_preprocessor('image')
-        self.conv = Conv2dHeadModel(image_shape, channels, kernel_sizes,
-                                    strides, hidden_sizes, output_size=action_size,
+        self.conv = Conv2dHeadModel(observation_shape.pixels, channels, kernel_sizes,
+                                    strides, hidden_sizes, output_size=2 * action_size,
                                     paddings=paddings,
                                     nonlinearity=nonlinearity, use_maxpool=False)
 
@@ -41,7 +42,7 @@ class PiConvModel(torch.nn.Module):
         observation = self.preprocessor(observation)
         lead_dim, T, B, _ = infer_leading_dims(observation,
             self._obs_ndim)
-        output = self.conv(observation.view(T * B, -1))
+        output = self.conv(observation.view(T * B, *self._image_shape))
         mu, log_std = output[:, :self._action_size], output[:, self._action_size:]
         mu, log_std = restore_leading_dims((mu, log_std), lead_dim, T, B)
         return mu, log_std
@@ -51,7 +52,7 @@ class QofMuConvModel(torch.nn.Module):
 
     def __init__(
             self,
-            image_shape,
+            observation_shape,
             channels,
             kernel_sizes,
             strides,
@@ -67,9 +68,10 @@ class QofMuConvModel(torch.nn.Module):
 
         self._obs_ndim = 3
         self._action_size = action_size
+        self._image_shape = observation_shape.pixels
 
         self.preprocessor = get_preprocessor('image')
-        c, h, w = image_shape
+        c, h, w = observation_shape.pixels
         self.conv = Conv2dModel(c, channels, kernel_sizes,
                                 strides, paddings=paddings, nonlinearity=nonlinearity)
         conv_out_size = self.conv.conv_out_size(h, w)
@@ -84,7 +86,7 @@ class QofMuConvModel(torch.nn.Module):
         lead_dim, T, B, _ = infer_leading_dims(observation,
             self._obs_ndim)
 
-        embedding = self.conv(observation.view(T * B, -1))
+        embedding = self.conv(observation.view(T * B, self._image_shape))
         q_input = torch.cat([embedding, action.view(T * B, -1)], dim=1)
         q = self.mlp(q_input).squeeze(-1)
         q = restore_leading_dims(q, lead_dim, T, B)
