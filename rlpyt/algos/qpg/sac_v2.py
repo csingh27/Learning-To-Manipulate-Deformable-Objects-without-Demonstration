@@ -214,7 +214,7 @@ class SAC(RlAlgorithm):
         alpha_loss = -valid_mean(self.agent.log_alpha * (log_pi + self.target_entropy).detach())
 
         losses = (q1_loss, q2_loss, pi_loss, alpha_loss)
-        values = tuple(val.detach() for val in (q1, q2, v, pi_mean, pi_log_std, alpha))
+        values = tuple(val.detach() for val in (q1, q2, pi_mean, pi_log_std, alpha))
         return losses, values
 
 
