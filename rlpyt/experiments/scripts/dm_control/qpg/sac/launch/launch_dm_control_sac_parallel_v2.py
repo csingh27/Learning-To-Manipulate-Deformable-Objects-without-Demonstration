@@ -9,12 +9,11 @@ affinity_code = encode_affinity(
     n_gpu=8,
     contexts_per_gpu=1,
     n_socket=2,
-    hyperthread_offset=24,
 )
 
 runs_per_setting = 2
 default_config_key = "sac_1M_serial_v2"
-experiment_title = "sac_dm_control_parallel_v2_8cpu"
+experiment_title = "sac_dm_control_parallel_v2_"
 variant_levels = list()
 
 domain = ['cloth_v0']
@@ -24,12 +23,13 @@ dir_names = ["env_{}_{}".format(*v) for v in values]
 keys = [('env', 'domain'), ('env', 'task')]
 variant_levels.append(VariantLevel(keys, values, dir_names))
 
-batch_B = [8, 8, 32, 32]
-batch_size = [256, 1024, 256, 1024]
-learning_rate = [3e-4, 6e-4, 3e-4, 6e-4]
-values = list(zip(batch_B, batch_size, learning_rate))
-dir_names = ["batch_B{}_bs{}_lr{}".format(*v) for v in values]
-keys = [('sampler', 'batch_B'), ('algo', 'replay_ratio'), ('algo', 'learning_rate')]
+batch_B = [32, 32, 32, 32]
+batch_size = [256, 256, 1024, 1024]
+learning_rate = [3e-4, 3e-4, 6e-4, 6e-4]
+replay_ratio = [32, 128, 32, 128]
+values = list(zip(batch_B, batch_size, learning_rate, replay_ratio))
+dir_names = ["batch_B{}_bs{}_lr{}_ratio{}".format(*v) for v in values]
+keys = [('sampler', 'batch_B'), ('algo', 'batch_size'), ('algo', 'learning_rate'), ('algo', 'replay_ratio')]
 variant_levels.append(VariantLevel(keys, values, dir_names))
 
 variants, log_dirs = make_variants(*variant_levels)
