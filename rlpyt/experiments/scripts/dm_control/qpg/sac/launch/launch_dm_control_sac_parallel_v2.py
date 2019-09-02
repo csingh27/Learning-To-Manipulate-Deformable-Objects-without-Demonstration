@@ -3,17 +3,19 @@ from rlpyt.utils.launching.affinity import encode_affinity
 from rlpyt.utils.launching.exp_launcher import run_experiments
 from rlpyt.utils.launching.variant import make_variants, VariantLevel
 
-script = "rlpyt/experiments/scripts/dm_control/qpg/sac/train/dm_control_sac_serial_v2.py"
+script = "rlpyt/experiments/scripts/dm_control/qpg/sac/train/dm_control_sac_parallel_v2.py"
 affinity_code = encode_affinity(
-    n_cpu_core=2,
-    n_gpu=1,
-    hyperthread_offset=2,
-    n_socket=1,
-    cpu_per_run=1,
+    n_cpu_core=16,
+    n_gpu=2,
+    cpu_reserved=8,
+    contexts_per_gpu=1,
+    gpu_per_run=1,
+    alternating=True
 )
+
 runs_per_setting = 2
-default_config_key = "sac_1M_serial_v2"
-experiment_title = "sac_dm_control_serial_v2"
+default_config_key = "sac_1M_parallel_v2"
+experiment_title = "sac_dm_control_parallel_v2_8cpu"
 variant_levels = list()
 
 domain = ['cloth_v0']
