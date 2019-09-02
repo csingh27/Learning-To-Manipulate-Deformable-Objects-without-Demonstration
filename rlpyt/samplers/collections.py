@@ -1,5 +1,6 @@
 
 from collections import namedtuple
+import numpy as np
 
 from rlpyt.utils.collections import namedarraytuple, AttrDict
 

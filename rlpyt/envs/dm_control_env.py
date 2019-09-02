@@ -144,7 +144,7 @@ class DMControlEnv(Env):
 
         return EnvStep(observation, reward, terminal, info)
 
-    def render(self, *args, mode='human', width=64, height=64,
+    def render(self, *args, mode='rgb_array', width=256, height=256,
                cameria_id=0, **kwargs):
         if mode == 'human':
             raise NotImplementedError(
@@ -152,8 +152,8 @@ class DMControlEnv(Env):
                 " viewers if one is already open."
                 " See: https://github.com/deepmind/dm_control/issues/39.")
         elif mode == 'rgb_array':
-            return self._env.physics.render(*args, width=width, height=height,
-                                            cameria_id=cameria_id, **kwargs)
+            return self._env.physics.render(width=width, height=height,
+                                            camera_id=cameria_id, **kwargs)
         raise NotImplementedError(mode)
 
     @property

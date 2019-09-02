@@ -41,8 +41,12 @@ class SerialEvalCollector(BaseEvalCollector):
             action = numpify_buffer(act_pyt)
             for b, env in enumerate(self.envs):
                 o, r, d, env_info = env.step(action[b])
-                traj_infos[b].step(observation[b], action[b], r, d,
-                    agent_info[b], env_info)
+                if include_observations:
+                    traj_infos[b].step(env.render(), action[b], r, d,
+                        agent_info[b], env_info)
+                else:
+                    traj_infos[b].step(observation[b], action[b], r, d,
+                        agent_info[b], env_info)
                 if getattr(env_info, "traj_done", d):
                     completed_traj_infos.append(traj_infos[b].terminate(o))
                     traj_infos[b] = self.TrajInfoCls()

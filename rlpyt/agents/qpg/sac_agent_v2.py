@@ -202,4 +202,4 @@ class SacAgent(BaseAgent):
         self.q2_model.load_state_dict(state_dict["q2_model"])
         self.target_q1_model.load_state_dict(state_dict['target_q1_model'])
         self.target_q2_model.load_state_dict(state_dict['target_q2_model'])
-        self.log_alpha.data = dict['alpha']
+        self.log_alpha.data = state_dict['alpha']

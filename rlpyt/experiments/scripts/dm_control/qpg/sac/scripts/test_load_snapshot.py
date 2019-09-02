@@ -4,6 +4,7 @@ import argparse
 import json
 
 import torch
+import numpy as np
 
 from rlpyt.envs.dm_control_env import DMControlEnv
 from rlpyt.agents.qpg.sac_agent_v2 import SacAgent
@@ -25,10 +26,13 @@ def main():
 
     itr, cum_steps = params['itr'], params['cum_steps']
     print(f'Loading experiment at itr {itr}, cum_steps {cum_steps}')
+
     agent_state_dict = params['agent_state_dict']
     optimizer_state_dict = params['optimizer_state_dict']
 
     agent = SacAgent(**config["agent"])
+    dummy_env = DMControlEnv(**config["env"])
+    agent.initialize(dummy_env.spaces)
     agent.load_state_dict(agent_state_dict)
 
     sampler = SerialSampler(
@@ -40,9 +44,24 @@ def main():
     )
     sampler.initialize(agent)
 
+    agent.to_device(cuda_idx=0)
     traj_infos = sampler.evaluate_agent(0, include_observations=True)
-    import ipdb; ipdb.set_trace()
+    returns = [traj_info.Return for traj_info in traj_infos]
+    lengths = [traj_info.Length for traj_info in traj_infos]
 
+    print('Returns', returns)
+    print(f'Average Return {np.mean(returns)}, Average Length {np.mean(lengths)}')
+
+    for i, traj_info in enumerate(traj_infos):
+        observations = np.stack(traj_info.Observations)
+        video_filename = join(args.snapshot_dir, f'episode_{i}.mp4')
+        save_video(observations, video_filename, fps=30)
+
+
+def save_video(video_frames, filename, fps=60):
+    assert int(fps) == fps, fps
+    import skvideo.io
+    skvideo.io.vwrite(filename, video_frames, inputdict={'-r': str(int(fps))})
 
 
 if __name__ == '__main__':
