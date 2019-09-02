@@ -51,8 +51,8 @@ configs["sac_1M_serial"] = config
 
 config = dict(
     agent=dict(
-        q_model_kwargs=None,
-        model_kwargs=None,
+        q_model_kwargs=dict(hidden_sizes=[256, 256]),
+        model_kwargs=dict(hidden_sizes=[256, 256]),
     ),
     algo=dict(
         discount=0.99,
@@ -95,11 +95,18 @@ config = dict(
 
 configs["sac_1M_serial_v2"] = config
 
+from rlpyt.models.qpg.conv2d import QofMuConvModel, PiConvModel
 
 config = dict(
     agent=dict(
-        q_model_kwargs=None,
-        model_kwargs=None,
+        ModelCls=PiConvModel,
+        QModelCls=QofMuConvModel,
+        q_model_kwargs=dict(image_shape=(3, 64, 64), channels=(64, 64, 64),
+                            kernel_sizes=(3, 3, 3), strides=(2, 2, 2),
+                            hidden_sizes=[256, 256]),
+        model_kwargs=dict(image_shape=(3, 64, 64), channels=(64, 64, 64),
+                          kernel_sizes=(3, 3, 3), strides=(2, 2, 2),
+                          hidden_sizes=[256, 256]),
     ),
     algo=dict(
         discount=0.99,

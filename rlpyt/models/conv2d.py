@@ -16,7 +16,6 @@ class Conv2dModel(torch.nn.Module):
             paddings=None,
             nonlinearity=torch.nn.ReLU,  # Module, not Functional.
             use_maxpool=False,  # if True: convs use stride 1, maxpool downsample.
-            head_sizes=None,  # Put an MLP head on top.
             ):
         super().__init__()
         if paddings is None:
