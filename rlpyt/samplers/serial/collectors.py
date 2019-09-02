@@ -23,8 +23,8 @@ class SerialEvalCollector(BaseEvalCollector):
             ):
         save__init__args(locals())
 
-    def collect_evaluation(self, itr):
-        traj_infos = [self.TrajInfoCls() for _ in range(len(self.envs))]
+    def collect_evaluation(self, itr, include_observations=False):
+        traj_infos = [self.TrajInfoCls(include_observations=include_observations) for _ in range(len(self.envs))]
         completed_traj_infos = list()
         observations = list()
         for env in self.envs:
