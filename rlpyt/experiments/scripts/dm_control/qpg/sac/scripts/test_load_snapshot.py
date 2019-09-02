@@ -8,8 +8,7 @@ import numpy as np
 
 from rlpyt.envs.dm_control_env import DMControlEnv
 from rlpyt.agents.qpg.sac_agent_v2 import SacAgent
-from rlpyt.samplers.parallel.cpu.collectors import CpuResetCollector
-from rlpyt.samplers.parallel.cpu.sampler import CpuSampler
+from rlpyt.samplers.parallel.cpu.sampler import SerialSampler
 
 
 def main():
@@ -35,10 +34,9 @@ def main():
     agent.initialize(dummy_env.spaces)
     agent.load_state_dict(agent_state_dict)
 
-    sampler = CpuSampler(
+    sampler = SerialSampler(
         EnvCls=DMControlEnv,
         env_kwargs=config["env"],
-        CollectorCls=CpuResetCollector,
         eval_env_kwargs=config["eval_env"],
         **config["sampler"]
     )

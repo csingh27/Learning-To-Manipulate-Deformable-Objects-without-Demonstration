@@ -37,6 +37,7 @@ class SerialEvalCollector(BaseEvalCollector):
         self.agent.reset()
         self.agent.eval_mode(itr)
         for t in range(self.max_T):
+            print(obs_pyt.view(-1)[0])
             act_pyt, agent_info = self.agent.step(obs_pyt, act_pyt, rew_pyt)
             action = numpify_buffer(act_pyt)
             for b, env in enumerate(self.envs):
