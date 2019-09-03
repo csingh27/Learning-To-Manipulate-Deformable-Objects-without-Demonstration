@@ -63,6 +63,12 @@ def convert_dm_control_to_rlpyt_space(dm_control_space):
 EnvInfo = None
 Observation = None
 
+def init_namedtuples(info_keys=['reward_diagonal', 'traj_done']):
+    global EnvInfo, Observation, State
+    EnvInfo = namedtuple('EnvInfo', info_keys)
+    Observation = namedarraytuple('Observation', ['pixels'])
+    State = namedtuple('State', ['pixels'])
+
 class DMControlEnv(Env):
 
     def __init__(self,

@@ -4,7 +4,7 @@ import sys
 from rlpyt.utils.launching.affinity import affinity_from_code
 from rlpyt.samplers.parallel.cpu.sampler import CpuSampler
 from rlpyt.samplers.parallel.cpu.collectors import CpuResetCollector
-from rlpyt.envs.dm_control_env import DMControlEnv
+from rlpyt.envs.dm_control_env import DMControlEnv, init_namedtuples
 from rlpyt.algos.qpg.sac_v2 import SAC
 from rlpyt.agents.qpg.sac_agent_v2 import SacAgent
 from rlpyt.runners.minibatch_rl import MinibatchRlEval
@@ -20,6 +20,9 @@ def build_and_train(slot_affinity_code, log_dir, run_ID, config_key):
     variant = load_variant(log_dir)
     print('Variant', variant)
     config = update_config(config, variant)
+
+    if 'pixel_wrapper_kwargs' in config['env']:
+        init_namedtuples()
 
     sampler = CpuSampler(
         EnvCls=DMControlEnv,
