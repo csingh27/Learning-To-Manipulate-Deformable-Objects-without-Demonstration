@@ -47,12 +47,10 @@ class ParallelSamplerBase(BaseSampler):
             logger.log(f"Total parallel evaluation envs: {eval_n_envs}.")
             self.eval_max_T = eval_max_T = int(self.eval_max_steps // eval_n_envs)
 
-        env = self.EnvCls(**self.env_kwargs)
-        self._agent_init(agent, env, global_B=global_B,
+        env_spaces = self._get_env_spaces(self.EnvCls, self.env_kwargs)
+        self._agent_init(agent, env_spaces, global_B=global_B,
             env_ranks=env_ranks)
-        examples = self._build_buffers(env, bootstrap_value)
-        env.close()
-        del env
+        examples = self._build_buffers(self.EnvCls, self.env_kwargs, bootstrap_value)
 
         self._build_parallel_ctrl(n_worker)
 
@@ -117,6 +115,18 @@ class ParallelSamplerBase(BaseSampler):
     # Helpers
     ######################################
 
+    def _get_env_spaces(self, EnvCls, env_kwargs):
+        def get_spaces(EnvCls, env_kwargs, examples):
+            env = EnvCls(**env_kwargs)
+            examples['spaces'] = env.spaces
+
+        mgr = mp.Manager()
+        examples = mgr.dict()
+        w = mp.Process(target=get_spaces, args=(EnvCls, env_kwargs, examples))
+        w.start()
+        w.join()
+        return examples['spaces']
+
     def _get_n_envs_list(self, affinity=None, n_worker=None, B=None):
         B = self.batch_spec.B if B is None else B
         n_worker = len(affinity["workers_cpus"]) if n_worker is None else n_worker
@@ -134,8 +144,8 @@ class ParallelSamplerBase(BaseSampler):
                 n_envs_list[b] += 1
         return n_envs_list
 
-    def _agent_init(self, agent, env, global_B=1, env_ranks=None):
-        agent.initialize(env.spaces, share_memory=True,
+    def _agent_init(self, agent, env_spaces, global_B=1, env_ranks=None):
+        agent.initialize(env_spaces, share_memory=True,
             global_B=global_B, env_ranks=env_ranks)
         self.agent = agent
 

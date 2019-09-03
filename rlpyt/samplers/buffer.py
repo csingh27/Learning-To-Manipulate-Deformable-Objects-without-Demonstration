@@ -8,28 +8,22 @@ from rlpyt.samplers.collections import (Samples, AgentSamples, AgentSamplesBsv,
     EnvSamples)
 
 
-def build_samples_buffer(agent, env, batch_spec, bootstrap_value=False,
+def build_samples_buffer(agent, EnvCls, env_kwargs, batch_spec, bootstrap_value=False,
         agent_shared=True, env_shared=True, subprocess=True, examples=None):
     """Recommended to step/reset agent and env in subprocess, so it doesn't
     affect settings in master before forking workers (e.g. torch num_threads
     (MKL) may be set at first forward computation.)"""
-
-    # Call reset once to generate the necessary Observation namedtuple
-    # or else pickling will fail when calling on a separate process
-    env.reset()
-    env.step(env.action_space.sample())
 
     if examples is None:
         if subprocess:
             mgr = mp.Manager()
             examples = mgr.dict()  # Examples pickled back to master.
             w = mp.Process(target=get_example_outputs,
-                args=(agent, env, examples, subprocess))
+                args=(agent, EnvCls, env_kwargs, examples, subprocess))
             w.start()
             w.join()
         else:
-            examples = dict()
-            get_example_outputs(agent, env, examples)
+            raise Exception('Unsupported, subprocess must be True')
 
     T, B = batch_spec
     all_action = buffer_from_example(examples["action"], (T + 1, B), agent_shared)
@@ -63,12 +57,13 @@ def build_samples_buffer(agent, env, batch_spec, bootstrap_value=False,
     return samples_pyt, samples_np, examples
 
 
-def get_example_outputs(agent, env, examples, subprocess=False):
+def get_example_outputs(agent, EnvCls, env_kwargs, examples, subprocess=False):
     """Do this in a sub-process to avoid setup conflict in master/workers (e.g.
     MKL)."""
     if subprocess:  # i.e. in subprocess.
         import torch
         torch.set_num_threads(1)  # Some fix to prevent MKL hang.
+    env = EnvCls(**env_kwargs)
     o = env.reset()
     a = env.action_space.sample()
     o, r, d, env_info = env.step(a)
