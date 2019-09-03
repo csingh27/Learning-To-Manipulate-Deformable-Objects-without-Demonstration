@@ -22,6 +22,15 @@ dir_names = ["env_{}_{}".format(*v) for v in values]
 keys = [('env', 'domain'), ('env', 'task')]
 variant_levels.append(VariantLevel(keys, values, dir_names))
 
+batch_B = [2, 32]
+batch_size = [256, 1024]
+learning_rate = [3e-4, 6e-4]
+replay_ratio = [128, 128]
+values = list(zip(batch_B, batch_size, learning_rate, replay_ratio))
+dir_names = ["batch_B{}_bs{}_lr{}_ratio{}".format(*v) for v in values]
+keys = [('sampler', 'batch_B'), ('algo', 'batch_size'), ('algo', 'learning_rate'), ('algo', 'replay_ratio')]
+variant_levels.append(VariantLevel(keys, values, dir_names))
+
 variants, log_dirs = make_variants(*variant_levels)
 
 run_experiments(
