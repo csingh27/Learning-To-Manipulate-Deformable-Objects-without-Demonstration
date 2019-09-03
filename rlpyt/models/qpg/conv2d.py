@@ -7,6 +7,13 @@ from rlpyt.models.mlp import MlpModel
 from rlpyt.models.conv2d import Conv2dHeadModel, Conv2dModel
 from rlpyt.models.preprocessor import get_preprocessor
 
+def _filter_name(fields, name):
+    fields = list(fields)
+    idx = fields.index(name)
+    del fields[idx]
+    return fields
+
+
 class PiConvModel(torch.nn.Module):
 
     def __init__(
@@ -23,6 +30,7 @@ class PiConvModel(torch.nn.Module):
         super().__init__()
         assert all([ks % 2 == 1 for ks in kernel_sizes])
         if paddings is None:
+            # SAME padding for odd kernel sizes
             paddings = [ks // 2 for ks in kernel_sizes]
 
         self._obs_ndim = 3
@@ -30,19 +38,27 @@ class PiConvModel(torch.nn.Module):
         self._image_shape = observation_shape.pixels
 
         self.preprocessor = get_preprocessor('image')
+
+        fields = _filter_name(observation_shape._fields, 'pixels')
+        assert all([len(getattr(observation_shape, f)) == 1 for f in fields])
+        extra_input_size = sum([getattr(observation_shape, f)[0] for f in fields])
         self.conv = Conv2dHeadModel(observation_shape.pixels, channels, kernel_sizes,
                                     strides, hidden_sizes, output_size=2 * action_size,
                                     paddings=paddings,
-                                    nonlinearity=nonlinearity, use_maxpool=False)
+                                    nonlinearity=nonlinearity, use_maxpool=False,
+                                    extra_input_size=extra_input_size)
 
     def forward(self, observation, prev_action, prev_reward):
-        if isinstance(observation, tuple):
-            observation = torch.cat(observation, dim=-1)
+        pixel_obs = self.preprocessor(observation.pixels)
+        lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
 
-        observation = self.preprocessor(observation)
-        lead_dim, T, B, _ = infer_leading_dims(observation,
-            self._obs_ndim)
-        output = self.conv(observation.view(T * B, *self._image_shape))
+        pixel_obs = pixel_obs.view(T * B, *self._image_shape)
+        fields = _filter_name(observation._fields, 'pixels')
+        extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
+                                 for f in fields], dim=-1)
+
+        output = self.conv(pixel_obs, extra_input=extra_input)
+
         mu, log_std = output[:, :self._action_size], output[:, self._action_size:]
         mu, log_std = restore_leading_dims((mu, log_std), lead_dim, T, B)
         return mu, log_std
@@ -71,25 +87,27 @@ class QofMuConvModel(torch.nn.Module):
         self._image_shape = observation_shape.pixels
 
         self.preprocessor = get_preprocessor('image')
-        c, h, w = observation_shape.pixels
-        self.conv = Conv2dModel(c, channels, kernel_sizes,
-                                strides, paddings=paddings, nonlinearity=nonlinearity)
-        conv_out_size = self.conv.conv_out_size(h, w)
-        self.mlp = MlpModel(conv_out_size + action_size, hidden_sizes,
-                            output_size=1, nonlinearity=nonlinearity)
+
+        fields = _filter_name(observation_shape._fields, 'pixels')
+        assert all([len(getattr(observation_shape, f)) == 1 for f in fields])
+        extra_input_size = sum([getattr(observation_shape, f)[0] for f in fields])
+        self.conv = Conv2dHeadModel(observation_shape.pixels, channels, kernel_sizes,
+                                    strides, hidden_sizes, output_size=2 * action_size,
+                                    paddings=paddings,
+                                    nonlinearity=nonlinearity, use_maxpool=False,
+                                    extra_input_size=extra_input_size + action_size)
 
     def forward(self, observation, prev_action, prev_reward, action):
-        if isinstance(observation, tuple):
-            observation = torch.cat(observation, dim=-1)
+        pixel_obs = self.preprocessor(observation.pixels)
+        lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
 
-        observation = self.preprocessor(observation)
-        lead_dim, T, B, _ = infer_leading_dims(observation,
-            self._obs_ndim)
+        pixel_obs = pixel_obs.view(T * B, *self._image_shape)
+        fields = _filter_name(observation._fields, 'pixels')
+        extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
+                                 for f in fields] + [action], dim=-1)
 
-        embeddings = self.conv(observation.view(T * B, *self._image_shape))
-        embeddings = embeddings.view(T * B, -1)
-        q_input = torch.cat([embeddings, action.view(T * B, -1)], dim=1)
-        q = self.mlp(q_input).squeeze(-1)
+        q = self.conv(pixel_obs, extra_input=extra_input).squeeze(-1)
         q = restore_leading_dims(q, lead_dim, T, B)
+
         return q
 

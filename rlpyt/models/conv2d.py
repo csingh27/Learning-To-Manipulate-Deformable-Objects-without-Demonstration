@@ -68,8 +68,10 @@ class Conv2dHeadModel(torch.nn.Module):
             paddings=None,
             nonlinearity=torch.nn.ReLU,
             use_maxpool=False,
+            extra_input_size=0,
             ):
         super().__init__()
+        self._extra_input_size = extra_input_size
         c, h, w = image_shape
         self.conv = Conv2dModel(
             in_channels=c,
@@ -82,7 +84,7 @@ class Conv2dHeadModel(torch.nn.Module):
         )
         conv_out_size = self.conv.conv_out_size(h, w)
         if hidden_sizes or output_size:
-            self.head = MlpModel(conv_out_size, hidden_sizes,
+            self.head = MlpModel(conv_out_size + extra_input_size, hidden_sizes,
                 output_size=output_size, nonlinearity=nonlinearity)
             if output_size is not None:
                 self._output_size = output_size
@@ -93,8 +95,16 @@ class Conv2dHeadModel(torch.nn.Module):
             self.head = lambda x: x
             self._output_size = conv_out_size
 
-    def forward(self, input):
-        return self.head(self.conv(input).view(input.shape[0], -1))
+    def forward(self, input, extra_input=None):
+        embedding = self.conv(input).view(input.shape[0], -1)
+
+        if self._extra_input_size > 0:
+            assert extra_input.shape[1] == self._extra_input_size
+            extra_input = extra_input.view(extra_input.shape[0], -1)
+            mlp_input = torch.cat((embedding, extra_input), dim=-1)
+        else:
+            mlp_input = embedding
+        return self.head(mlp_input)
 
     @property
     def output_size(self):
