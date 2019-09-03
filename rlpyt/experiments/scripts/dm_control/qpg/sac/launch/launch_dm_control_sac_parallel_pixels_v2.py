@@ -5,10 +5,9 @@ from rlpyt.utils.launching.variant import make_variants, VariantLevel
 
 script = "rlpyt/experiments/scripts/dm_control/qpg/sac/train/dm_control_sac_parallel_v2.py"
 affinity_code = encode_affinity(
-    n_cpu_core=4,
-    n_gpu=1,
+    n_cpu_core=20,
+    n_gpu=4,
     contexts_per_gpu=1,
-    n_socket=2,
 )
 
 runs_per_setting = 2

@@ -112,12 +112,11 @@ class DMControlEnv(Env):
         self._step_count = 0
         time_step = self._env.reset()
         observation = self._filter_observation(time_step.observation)
-        time_step._replace(observation=observation)
 
         global Observation
         if Observation is None:
             Observation = namedarraytuple("Observation", list(observation.keys()))
-        observation = Observation(**{k: v for k, v in time_step.observation.items()
+        observation = Observation(**{k: v for k, v in observation.items()
                                      if k in self._observation_keys})
         return observation
 
@@ -132,7 +131,6 @@ class DMControlEnv(Env):
             if key not in self._observation_keys
         })
         observation = self._filter_observation(time_step.observation)
-        time_step._replace(observation=observation)
 
         self._step_count += 1
         info['traj_done'] = self._step_count >= self._max_path_length
