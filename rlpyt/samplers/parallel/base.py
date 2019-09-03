@@ -47,9 +47,16 @@ class ParallelSamplerBase(BaseSampler):
             logger.log(f"Total parallel evaluation envs: {eval_n_envs}.")
             self.eval_max_T = eval_max_T = int(self.eval_max_steps // eval_n_envs)
 
-        env_spaces = self._get_env_spaces(self.EnvCls, self.env_kwargs)
-        self._agent_init(agent, env_spaces, global_B=global_B,
-            env_ranks=env_ranks)
+        if self.is_pixel:
+            env_spaces = self._get_env_spaces(self.EnvCls, self.env_kwargs)
+            self._agent_init(agent, env_spaces, global_B=global_B,
+                env_ranks=env_ranks)
+        else:
+            env = self.EnvCls(**self.env_kwargs)
+            env.reset()
+            env.step(env.action_space.sample())
+            self._agent_init(agent, env.spaces, global_B=global_B,
+                             env_ranks=env_ranks)
         examples = self._build_buffers(self.EnvCls, self.env_kwargs, bootstrap_value)
 
         self._build_parallel_ctrl(n_worker)

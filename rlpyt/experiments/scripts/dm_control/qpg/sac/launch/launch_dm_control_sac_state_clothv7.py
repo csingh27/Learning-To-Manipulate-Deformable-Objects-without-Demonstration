@@ -3,7 +3,7 @@ from rlpyt.utils.launching.affinity import encode_affinity
 from rlpyt.utils.launching.exp_launcher import run_experiments
 from rlpyt.utils.launching.variant import make_variants, VariantLevel
 
-script = "rlpyt/experiments/scripts/dm_control/qpg/sac/train/dm_control_sac.py"
+script = "rlpyt/experiments/scripts/dm_control/qpg/sac/train/dm_control_sac_autoreg.py"
 affinity_code = encode_affinity(
     n_cpu_core=20,
     n_gpu=4,
@@ -12,8 +12,8 @@ affinity_code = encode_affinity(
 )
 
 runs_per_setting = 2
-default_config_key = "sac_state_clothv8"
-experiment_title = "sac_dm_control_state_clothv8"
+default_config_key = "sac_state_clothv7"
+experiment_title = "sac_dm_control_state_clothv7"
 variant_levels = list()
 
 modes = ['corners', 'border', 'inner_border', '3x3', '5x5', '9x9']

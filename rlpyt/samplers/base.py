@@ -23,6 +23,7 @@ class BaseSampler:
             eval_env_kwargs=None,
             eval_max_steps=None,  # int if using evaluation.
             eval_max_trajectories=None,  # Optional earlier cutoff.
+            is_pixel=False, # Special if using pixel render on dm_control
             ):
         eval_max_steps = None if eval_max_steps is None else int(eval_max_steps)
         eval_max_trajectories = (None if eval_max_trajectories is None else

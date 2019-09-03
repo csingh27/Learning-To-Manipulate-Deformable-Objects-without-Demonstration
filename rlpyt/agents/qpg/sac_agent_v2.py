@@ -37,9 +37,9 @@ class SacAgent(BaseAgent):
             action_squash=1,  # Max magnitude (or None).
             pretrain_std=0.75,  # High value to make near uniform sampling.
             ):
-        if ModelCls is not None:
+        if isinstance(ModelCls, str):
             ModelCls = eval(ModelCls)
-        if QModelCls is not None:
+        if isinstance(QModelCls, str):
             QModelCls = eval(QModelCls)
 
         if model_kwargs is None:
@@ -89,7 +89,7 @@ class SacAgent(BaseAgent):
         self.log_alpha.to(self.device)
 
     def data_parallel(self):
-        super().data_parallel
+        super().data_parallel()
         DDP_WRAP = DDPC if self.device.type == "cpu" else DDP
         self.q1_model = DDP_WRAP(self.q1_model)
         self.q2_model = DDP_WRAP(self.q2_model)

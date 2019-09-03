@@ -6,7 +6,7 @@ from rlpyt.samplers.parallel.cpu.sampler import CpuSampler
 from rlpyt.samplers.parallel.cpu.collectors import CpuResetCollector
 from rlpyt.envs.dm_control_env import DMControlEnv, init_namedtuples
 from rlpyt.algos.qpg.sac_v2 import SAC
-from rlpyt.agents.qpg.sac_agent_v2 import SacAgent
+from rlpyt.agents.qpg.sac_agent_autoreg_v2 import SacAgent
 from rlpyt.runners.minibatch_rl import MinibatchRlEval
 from rlpyt.utils.logging.context import logger_context
 from rlpyt.utils.launching.variant import load_variant, update_config

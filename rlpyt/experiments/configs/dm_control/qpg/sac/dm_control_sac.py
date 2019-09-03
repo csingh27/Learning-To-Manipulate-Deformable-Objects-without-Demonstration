@@ -22,7 +22,7 @@ config = dict(
     model=dict(),
     optim=dict(),
     runner=dict(
-        n_steps=5e5,
+        n_steps=1e6,
         log_interval_steps=1e4,
     ),
     sampler=dict(
@@ -39,12 +39,6 @@ config = dict(
         max_path_length=1200,
         task_kwargs=dict(reward='diagonal')
     ),
-    eval_env=dict(
-        domain='cloth_v0',
-        task='easy',
-        max_path_length=1200,
-        task_kwargs=dict(reward='diagonal')
-    )
 )
 
 configs["sac_state_clothv0"] = config
@@ -74,10 +68,11 @@ config = dict(
     model=dict(),
     optim=dict(),
     runner=dict(
-        n_steps=5e5,
+        n_steps=1e6,
         log_interval_steps=1e4,
     ),
     sampler=dict(
+        is_pixel=True,
         batch_T=1,
         batch_B=32,
         max_decorrelation_steps=0,
@@ -93,25 +88,21 @@ config = dict(
         pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=True,
                                   render_kwargs=dict(width=64, height=64))
     ),
-    eval_env=dict(
-        domain='cloth_v0',
-        task='easy',
-        max_path_length=1200,
-        task_kwargs=dict(reward='diagonal'),
-        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=True,
-                                  render_kwargs=dict(width=64, height=64))
-    )
 )
 
 configs["sac_pixels_clothv0"] = config
 
 config = copy.deepcopy(configs['sac_state_clothv0'])
 config['env']['domain'] = 'cloth_v8'
-config['eval_env']['domain'] = 'cloth_v8'
 config['env']['task_kwargs']['mode'] = 'corners'
 config['env']['task_kwargs']['distance_weight'] = 0.0
-config['eval_env']['task_kwargs']['mode'] = 'corners'
-config['eval_env']['task_kwargs']['distance_weight'] = 0.0
 
 configs["sac_state_clothv8"] = config
+
+config = copy.deepcopy(configs['sac_state_clothv8'])
+config['env']['domain'] = 'cloth_v7'
+config['env']['task_kwargs']['mode'] = 'corners'
+config['env']['task_kwargs']['distance_weight'] = 0.0
+
+configs["sac_state_clothv7"] = config
 
