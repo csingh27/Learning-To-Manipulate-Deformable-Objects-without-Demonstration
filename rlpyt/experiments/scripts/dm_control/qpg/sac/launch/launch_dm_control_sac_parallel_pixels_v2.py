@@ -8,6 +8,7 @@ affinity_code = encode_affinity(
     n_cpu_core=20,
     n_gpu=4,
     contexts_per_gpu=1,
+    n_socket=2,
 )
 
 runs_per_setting = 2

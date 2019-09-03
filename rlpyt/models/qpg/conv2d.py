@@ -86,8 +86,9 @@ class QofMuConvModel(torch.nn.Module):
         lead_dim, T, B, _ = infer_leading_dims(observation,
             self._obs_ndim)
 
-        embedding = self.conv(observation.view(T * B, *self._image_shape))
-        q_input = torch.cat([embedding, action.view(T * B, -1)], dim=1)
+        embeddings = self.conv(observation.view(T * B, *self._image_shape))
+        embeddings = embeddings.view(T * B, -1)
+        q_input = torch.cat([embeddings, action.view(T * B, -1)], dim=1)
         q = self.mlp(q_input).squeeze(-1)
         q = restore_leading_dims(q, lead_dim, T, B)
         return q
