@@ -22,7 +22,7 @@ def build_and_train(slot_affinity_code, log_dir, run_ID, config_key):
     print('Config', config)
 
     if 'pixel_wrapper_kwargs' in config['env']:
-        init_namedtuples()
+        init_namedtuples(['reward_diagonal', 'distance_reward', 'traj_done'])
 
     sampler = CpuSampler(
         EnvCls=DMControlEnv,

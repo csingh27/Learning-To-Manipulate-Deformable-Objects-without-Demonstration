@@ -68,7 +68,7 @@ config = dict(
     model=dict(),
     optim=dict(),
     runner=dict(
-        n_steps=1e6,
+        n_steps=5e5,
         log_interval_steps=1e4,
     ),
     sampler=dict(
@@ -98,6 +98,14 @@ config['env']['task_kwargs']['mode'] = 'corners'
 config['env']['task_kwargs']['distance_weight'] = 0.0
 
 configs["sac_state_clothv8"] = config
+
+config = copy.deepcopy(configs['sac_pixels_clothv0'])
+config['env']['domain'] = 'cloth_v8'
+config['env']['task_kwargs']['mode'] = 'corners'
+config['env']['task_kwargs']['distance_weight'] = 0.0
+
+configs["sac_pixels_clothv8"] = config
+
 
 config = copy.deepcopy(configs['sac_state_clothv8'])
 config['env']['domain'] = 'cloth_v7'
