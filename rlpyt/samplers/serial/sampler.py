@@ -33,9 +33,13 @@ class SerialSampler(BaseSampler):
         env_ranks = list(range(rank * B, (rank + 1) * B))
         agent.initialize(envs[0].spaces, share_memory=False,
             global_B=global_B, env_ranks=env_ranks)
-        samples_pyt, samples_np, examples = build_samples_buffer(agent, envs[0],
+
+        envs[0].reset()
+        envs[0].step(envs[0].action_space.sample())
+
+        samples_pyt, samples_np, examples = build_samples_buffer(agent, self.EnvCls, self.env_kwargs,
             self.batch_spec, bootstrap_value, agent_shared=False,
-            env_shared=False, subprocess=False)
+            env_shared=False, subprocess=True)
         if traj_info_kwargs:
             for k, v in traj_info_kwargs.items():
                 setattr(self.TrajInfoCls, "_" + k, v)  # Avoid passing at init.

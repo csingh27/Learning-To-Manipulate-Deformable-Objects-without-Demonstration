@@ -22,6 +22,9 @@ def main():
     params = torch.load(snapshot_file, map_location='cpu')
     with open(config_file, 'r') as f:
         config = json.load(f)
+    config['sampler']['batch_B'] = 1
+    config['sampler']['eval_n_envs'] = 1
+    config['sampler']['eval_max_trajectories'] = 10
 
     itr, cum_steps = params['itr'], params['cum_steps']
     print(f'Loading experiment at itr {itr}, cum_steps {cum_steps}')
@@ -33,7 +36,7 @@ def main():
     sampler = SerialSampler(
         EnvCls=DMControlEnv,
         env_kwargs=config["env"],
-        eval_env_kwargs=config["eval_env"],
+        eval_env_kwargs=config["env"],
         **config["sampler"]
     )
     sampler.initialize(agent)
@@ -52,10 +55,10 @@ def main():
     for i, traj_info in enumerate(traj_infos):
         observations = np.stack(traj_info.Observations)
         video_filename = join(args.snapshot_dir, f'episode_{i}.mp4')
-        save_video(observations, video_filename, fps=30)
+        save_video(observations, video_filename, fps=10)
 
 
-def save_video(video_frames, filename, fps=60):
+def save_video(video_frames, filename, fps=10):
     assert int(fps) == fps, fps
     import skvideo.io
     skvideo.io.vwrite(filename, video_frames, inputdict={'-r': str(int(fps))})

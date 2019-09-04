@@ -37,7 +37,6 @@ class SerialEvalCollector(BaseEvalCollector):
         self.agent.reset()
         self.agent.eval_mode(itr)
         for t in range(self.max_T):
-            print(obs_pyt.view(-1)[0])
             act_pyt, agent_info = self.agent.step(obs_pyt, act_pyt, rew_pyt)
             action = numpify_buffer(act_pyt)
             for b, env in enumerate(self.envs):
@@ -50,7 +49,7 @@ class SerialEvalCollector(BaseEvalCollector):
                         agent_info[b], env_info)
                 if getattr(env_info, "traj_done", d):
                     completed_traj_infos.append(traj_infos[b].terminate(o))
-                    traj_infos[b] = self.TrajInfoCls()
+                    traj_infos[b] = self.TrajInfoCls(include_observations=include_observations)
                     o = env.reset()
                 if d:
                     action[b] = 0  # Prev_action for next step.
