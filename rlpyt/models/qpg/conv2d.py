@@ -40,7 +40,7 @@ class PiConvModel(torch.nn.Module):
         self.preprocessor = get_preprocessor('image')
 
         fields = _filter_name(observation_shape._fields, 'pixels')
-        assert all([len(getattr(observation_shape, f)) == 1 for f in fields])
+        assert all([len(getattr(observation_shape, f)) == 1 for f in fields]), observation_shape
         extra_input_size = sum([getattr(observation_shape, f)[0] for f in fields])
         self.conv = Conv2dHeadModel(observation_shape.pixels, channels, kernel_sizes,
                                     strides, hidden_sizes, output_size=2 * action_size,
@@ -89,10 +89,10 @@ class QofMuConvModel(torch.nn.Module):
         self.preprocessor = get_preprocessor('image')
 
         fields = _filter_name(observation_shape._fields, 'pixels')
-        assert all([len(getattr(observation_shape, f)) == 1 for f in fields])
+        assert all([len(getattr(observation_shape, f)) == 1 for f in fields]), observation_shape
         extra_input_size = sum([getattr(observation_shape, f)[0] for f in fields])
         self.conv = Conv2dHeadModel(observation_shape.pixels, channels, kernel_sizes,
-                                    strides, hidden_sizes, output_size=2 * action_size,
+                                    strides, hidden_sizes, output_size=1,
                                     paddings=paddings,
                                     nonlinearity=nonlinearity, use_maxpool=False,
                                     extra_input_size=extra_input_size + action_size)

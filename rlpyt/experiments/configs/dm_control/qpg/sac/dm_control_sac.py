@@ -27,7 +27,7 @@ config = dict(
     ),
     sampler=dict(
         batch_T=1,
-        batch_B=32,
+        batch_B=16,
         max_decorrelation_steps=0,
         eval_n_envs=10,
         eval_max_steps=20000,
@@ -74,7 +74,7 @@ config = dict(
     sampler=dict(
         is_pixel=True,
         batch_T=1,
-        batch_B=32,
+        batch_B=16,
         max_decorrelation_steps=0,
         eval_n_envs=10,
         eval_max_steps=20000,

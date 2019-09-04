@@ -66,8 +66,8 @@ Observation = None
 def init_namedtuples(info_keys=['traj_done']):
     global EnvInfo, Observation, State
     EnvInfo = namedtuple('EnvInfo', info_keys)
-    Observation = namedarraytuple('Observation', ['pixels', 'force_location'])
-    State = namedtuple('State', ['pixels', 'force_location'])
+    Observation = namedarraytuple('Observation', ['force_location', 'pixels'])
+    State = namedtuple('State', ['force_location', 'pixels'])
 
 class DMControlEnv(Env):
 
@@ -172,7 +172,7 @@ class DMControlEnv(Env):
 
     def _filter_observation(self, observation):
         observation = type(observation)([
-            (name, np.transpose(value, (2, 0, 1)).astype('float32'))
+            (name, np.ascontiguousarray(np.transpose(value, (2, 0, 1)), dtype='float32'))
             if name == 'pixels' else (name, value)
             for name, value in observation.items()
             if name in self._observation_keys
