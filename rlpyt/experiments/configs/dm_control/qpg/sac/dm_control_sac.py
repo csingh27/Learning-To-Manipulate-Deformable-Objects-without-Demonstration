@@ -68,7 +68,7 @@ config = dict(
     model=dict(),
     optim=dict(),
     runner=dict(
-        n_steps=5e5,
+        n_steps=2e5,
         log_interval_steps=1e4,
     ),
     sampler=dict(
@@ -85,7 +85,7 @@ config = dict(
         task='easy',
         max_path_length=1200,
         task_kwargs=dict(reward='diagonal'),
-        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=True,
+        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False,
                                   render_kwargs=dict(width=64, height=64))
     ),
 )
@@ -100,12 +100,11 @@ config['env']['task_kwargs']['distance_weight'] = 0.0
 configs["sac_state_clothv8"] = config
 
 config = copy.deepcopy(configs['sac_pixels_clothv0'])
-config['env']['domain'] = 'cloth_v8'
+config['env']['domain'] = 'cloth_v0'
 config['env']['task_kwargs']['mode'] = 'corners'
 config['env']['task_kwargs']['distance_weight'] = 0.0
 
 configs["sac_pixels_clothv8"] = config
-
 
 config = copy.deepcopy(configs['sac_state_clothv8'])
 config['env']['domain'] = 'cloth_v7'
@@ -113,4 +112,26 @@ config['env']['task_kwargs']['mode'] = 'corners'
 config['env']['task_kwargs']['distance_weight'] = 0.0
 
 configs["sac_state_clothv7"] = config
+
+config = copy.deepcopy(configs['sac_pixels_clothv8'])
+config['env']['domain'] = 'cloth_v8'
+config['env']['task_kwargs']['mode'] = 'corners'
+config['env']['task_kwargs']['distance_weight'] = 0.0
+
+configs["sac_pixels_clothv8"] = config
+
+config = copy.deepcopy(configs['sac_state_clothv8'])
+config['env']['domain'] = 'cloth_sim_state'
+config['env']['max_path_length'] = 30
+config['env']['task_kwargs'] = dict(mode='corners')
+
+configs["sac_state_cloth_sim"] = config
+
+config = copy.deepcopy(configs['sac_pixels_clothv8'])
+config['env']['domain'] = 'cloth_v8'
+config['env']['max_path_length'] = 30
+del config['env']['task_kwargs']
+
+configs["sac_pixels_cloth_sim"] = config
+
 
