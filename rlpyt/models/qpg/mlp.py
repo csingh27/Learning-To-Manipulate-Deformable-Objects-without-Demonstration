@@ -135,15 +135,17 @@ class QofMuMlpModel(torch.nn.Module):
             observation_shape,
             hidden_sizes,
             action_size,
+            n_tile=1,
             ):
         super().__init__()
         self._obs_ndim = 1
+        self._n_tile = n_tile
         input_dim = int(np.sum(observation_shape))
 
         # self._obs_ndim = len(observation_shape)
         # input_dim = int(np.prod(observation_shape))
 
-        input_dim += action_size
+        input_dim += action_size * n_tile
         self.mlp = MlpModel(
             input_size=input_dim,
             hidden_sizes=hidden_sizes,
@@ -156,8 +158,9 @@ class QofMuMlpModel(torch.nn.Module):
 
         lead_dim, T, B, _ = infer_leading_dims(observation,
             self._obs_ndim)
+        action = action.view(T * B, -1).repeat(1, self._n_tile)
         q_input = torch.cat(
-            [observation.view(T * B, -1), action.view(T * B, -1)], dim=1)
+            [observation.view(T * B, -1), action], dim=1)
         q = self.mlp(q_input).squeeze(-1)
         q = restore_leading_dims(q, lead_dim, T, B)
         return q
