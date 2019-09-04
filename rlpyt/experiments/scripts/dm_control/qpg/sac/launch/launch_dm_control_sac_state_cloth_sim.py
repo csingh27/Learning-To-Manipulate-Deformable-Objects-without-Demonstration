@@ -5,9 +5,9 @@ from rlpyt.utils.launching.variant import make_variants, VariantLevel
 
 script = "rlpyt/experiments/scripts/dm_control/qpg/sac/train/dm_control_sac.py"
 affinity_code = encode_affinity(
-    n_cpu_core=16,
+    n_cpu_core=20,
     n_gpu=4,
-    contexts_per_gpu=2,
+    contexts_per_gpu=1,
 )
 
 runs_per_setting = 2
@@ -19,6 +19,12 @@ modes = ['corners', 'border', 'inner_border', '3x3', '5x5', '9x9']
 values = list(zip(modes))
 dir_names = ['mode_{}'.format(*v) for v in values]
 keys = [('env', 'task_kwargs', 'mode')]
+variant_levels.append(VariantLevel(keys, values, dir_names))
+
+max_path_lengths = [15, 30]
+values = list(zip(max_path_lengths))
+dir_names = ['mpl_{}'.format(*v) for v in values]
+keys = [('env', 'max_path_length')]
 variant_levels.append(VariantLevel(keys, values, dir_names))
 
 variants, log_dirs = make_variants(*variant_levels)

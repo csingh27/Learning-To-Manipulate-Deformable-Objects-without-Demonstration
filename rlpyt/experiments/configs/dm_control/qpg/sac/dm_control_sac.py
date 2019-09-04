@@ -22,12 +22,12 @@ config = dict(
     model=dict(),
     optim=dict(),
     runner=dict(
-        n_steps=1e6,
+        n_steps=2e5,
         log_interval_steps=1e4,
     ),
     sampler=dict(
         batch_T=1,
-        batch_B=16,
+        batch_B=32,
         max_decorrelation_steps=0,
         eval_n_envs=10,
         eval_max_steps=20000,
@@ -124,6 +124,7 @@ config = copy.deepcopy(configs['sac_state_clothv8'])
 config['env']['domain'] = 'cloth_sim_state'
 config['env']['max_path_length'] = 30
 config['env']['task_kwargs'] = dict(mode='corners')
+config['agent']['q_model_kwargs']['n_tile'] = 20
 
 configs["sac_state_cloth_sim"] = config
 
@@ -131,6 +132,7 @@ config = copy.deepcopy(configs['sac_pixels_clothv8'])
 config['env']['domain'] = 'cloth_v8'
 config['env']['max_path_length'] = 30
 del config['env']['task_kwargs']
+config['agent']['q_model_kwargs']['n_tile'] = 20
 
 configs["sac_pixels_cloth_sim"] = config
 

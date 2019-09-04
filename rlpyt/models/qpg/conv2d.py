@@ -25,7 +25,7 @@ class PiConvModel(torch.nn.Module):
             hidden_sizes,
             action_size,
             paddings=None,
-            nonlinearity=torch.nn.LeakyReLU
+            nonlinearity=torch.nn.LeakyReLU,
             ):
         super().__init__()
         assert all([ks % 2 == 1 for ks in kernel_sizes])
@@ -75,7 +75,8 @@ class QofMuConvModel(torch.nn.Module):
             hidden_sizes,
             action_size,
             paddings=None,
-            nonlinearity=torch.nn.LeakyReLU
+            nonlinearity=torch.nn.LeakyReLU,
+            n_tile=1,
             ):
         super().__init__()
         assert all([ks % 2 == 1 for ks in kernel_sizes])
@@ -85,6 +86,7 @@ class QofMuConvModel(torch.nn.Module):
         self._obs_ndim = 3
         self._action_size = action_size
         self._image_shape = observation_shape.pixels
+        self._n_tile = n_tile
 
         self.preprocessor = get_preprocessor('image')
 
@@ -95,7 +97,7 @@ class QofMuConvModel(torch.nn.Module):
                                     strides, hidden_sizes, output_size=1,
                                     paddings=paddings,
                                     nonlinearity=nonlinearity, use_maxpool=False,
-                                    extra_input_size=extra_input_size + action_size)
+                                    extra_input_size=extra_input_size + action_size * n_tile)
 
     def forward(self, observation, prev_action, prev_reward, action):
         pixel_obs = self.preprocessor(observation.pixels)
@@ -103,6 +105,7 @@ class QofMuConvModel(torch.nn.Module):
 
         pixel_obs = pixel_obs.view(T * B, *self._image_shape)
         fields = _filter_name(observation._fields, 'pixels')
+        action = action.view(T * B, -1).repeat(1, self._n_tile)
         extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
                                  for f in fields] + [action], dim=-1)
 
