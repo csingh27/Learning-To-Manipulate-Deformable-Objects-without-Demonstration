@@ -15,10 +15,11 @@ default_config_key = "sac_pixels_cloth_sim"
 experiment_title = "sac_dm_control_pixels_cloth_sim"
 variant_levels = list()
 
-modes = ['corners', 'border', 'inner_border', '3x3', '5x5', '9x9']
-values = list(zip(modes))
-dir_names = ['mode_{}'.format(*v) for v in values]
-keys = [('env', 'task_kwargs', 'mode')]
+domains = ['cloth_sim']
+tasks = ['easy']
+values = list(zip(domains, tasks))
+dir_names = ['domain_{}_task_{}'.format(*v) for v in values]
+keys = [('env', 'domain'), ('env', 'task')]
 variant_levels.append(VariantLevel(keys, values, dir_names))
 
 variants, log_dirs = make_variants(*variant_levels)
