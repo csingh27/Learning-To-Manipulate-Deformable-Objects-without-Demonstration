@@ -136,4 +136,9 @@ config['agent']['q_model_kwargs']['n_tile'] = 20
 
 configs["sac_pixels_cloth_sim"] = config
 
+config = copy.deepcopy(configs['sac_state_clothv0'])
+config['runner']['n_steps'] = 1e6
+config['env']['domain'] = 'rope_v1'
+del config['env']['task_kwargs']
 
+configs["sac_state_ropev1"] = config
