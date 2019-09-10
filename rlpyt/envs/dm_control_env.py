@@ -70,7 +70,7 @@ def init_namedtuples(info_keys=None, state_keys=None):
         info_keys = ['traj_done']
 
     if state_keys is None:
-        info_keys = ['pixels']
+        state_keys = ['pixels']
 
     EnvInfo = namedtuple('EnvInfo', info_keys)
     Observation = namedarraytuple('Observation', state_keys)

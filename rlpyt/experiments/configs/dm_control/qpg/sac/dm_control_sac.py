@@ -85,7 +85,7 @@ config = dict(
         task='easy',
         max_path_length=1200,
         task_kwargs=dict(reward='diagonal'),
-        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False,
+        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=True,
                                   render_kwargs=dict(width=64, height=64))
     ),
 )
@@ -139,9 +139,18 @@ configs["sac_pixels_cloth_sim"] = config
 config = copy.deepcopy(configs['sac_state_clothv0'])
 config['runner']['n_steps'] = 1e6
 config['env']['domain'] = 'rope_v1'
+config['env']['max_path_length'] = 1000
 del config['env']['task_kwargs']
 
 configs["sac_state_ropev1"] = config
+
+config = copy.deepcopy(configs['sac_pixels_clothv0'])
+config['runner']['n_steps'] = 1e6
+config['env']['domain'] = 'rope_v1'
+config['env']['max_path_length'] = 1000
+del config['env']['task_kwargs']
+
+configs["sac_pixels_ropev1"] = config
 
 config = dict(
     agent=dict(

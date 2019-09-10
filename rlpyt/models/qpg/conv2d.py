@@ -52,6 +52,7 @@ class PiConvModel(torch.nn.Module):
         fields = _filter_name(observation_shape._fields, 'pixels')
         assert all([len(getattr(observation_shape, f)) == 1 for f in fields]), observation_shape
         extra_input_size = sum([getattr(observation_shape, f)[0] for f in fields])
+        self._extra_input_size = extra_input_size
         self.conv = Conv2dHeadModel(observation_shape.pixels, channels, kernel_sizes,
                                     strides, hidden_sizes, output_size=2 * action_size,
                                     paddings=paddings,
@@ -64,8 +65,12 @@ class PiConvModel(torch.nn.Module):
 
         pixel_obs = pixel_obs.view(T * B, *self._image_shape)
         fields = _filter_name(observation._fields, 'pixels')
-        extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
-                                 for f in fields], dim=-1)
+
+        if self._extra_input_size > 0:
+            extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
+                                     for f in fields], dim=-1)
+        else:
+            extra_input = None
 
         output = self.conv(pixel_obs, extra_input=extra_input)
 
