@@ -1,9 +1,15 @@
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from rlpyt.utils.tensor import infer_leading_dims, restore_leading_dims
 from rlpyt.models.mlp import MlpModel
+from rlpyt.distributions.gaussian import Gaussian, DistInfoStd, Categorical, DistInfo
+
+
+MIN_LOG_STD = -20
+MAX_LOG_STD = 2
 
 
 class MuMlpModel(torch.nn.Module):
@@ -126,6 +132,76 @@ class AutoregPiMlpModel(torch.nn.Module):
 
     def has_next(self):
         return self._counter < 2
+
+
+class GumbelPiMlpModel(torch.nn.Module):
+    """For picking corners"""
+
+    def __init__(
+            self,
+            observation_shape,
+            hidden_sizes,
+            action_size,
+            ):
+        super().__init__()
+        self._obs_ndim = 1
+        input_dim = int(np.sum(observation_shape))
+
+        self._action_size = action_size
+        self.mlp = MlpModel(
+            input_size=input_dim,
+            hidden_sizes=hidden_sizes,
+            output_size=12 * 2 + 4, # 3 for each corners, times two for std, 4 probs
+        )
+
+        self.delta_distribution = Gaussian(
+            dim=12,
+            squash=self.action_squash,
+            min_std=np.exp(MIN_LOG_STD),
+            max_std=np.exp(MAX_LOG_STD),
+        )
+        self.cat_distribution = Categorical()
+
+
+    def forward(self, observation, prev_action, prev_reward):
+        if isinstance(observation, tuple):
+            observation = torch.cat(observation, dim=-1)
+
+        lead_dim, T, B, _ = infer_leading_dims(observation,
+            self._obs_ndim)
+        output = self.mlp(observation.view(T * B, -1))
+        prob = F.softmax(output[:, :4] / 10., dim=-1)
+        mu, log_std = output[:, 4:4 + self._action_size], output[:, 4 + self._action_size:]
+        prob, mu, log_std = restore_leading_dims((prob, mu, log_std), lead_dim, T, B)
+        return DistInfo(prob=prob), DistInfoStd(mu=mu, log_std=log_std)
+
+    def sample_loglikelihood(self, dist_info):
+        cat_dist_info, delta_dist_info = dist_info
+        cat_sample, cat_loglikelihood = self.cat_distribution.sample_loglikelihood(cat_dist_info)
+        one_hot = torch.zeros_like(cat_dist_info.prob)
+        one_hot.scatter_(1, cat_sample, 1)
+        one_hot = (one_hot - cat_dist_info.prob).detach() + cat_dist_info.prob # Make action differentiable through prob
+
+        delta_sample, delta_loglikelihood = self.delta_distribution.sample_loglikelihood(delta_dist_info)
+        action = torch.cat((one_hot, delta_sample), dim=-1)
+        log_likelihood = cat_loglikelihood + delta_loglikelihood
+        return action, log_likelihood
+
+    def sample(self, dist_info):
+        cat_dist_info, delta_dist_info = dist_info
+        if self.training:
+            cat_sample = self.cat_distribution.sample(cat_dist_info)
+        else:
+            cat_sample = torch.max(cat_dist_info.prob, dim=-1)[1].view(-1)
+        one_hot = torch.zeros_like(cat_dist_info.prob)
+        one_hot.scatter_(1, cat_sample, 1)
+
+        if self.training:
+            self.delta_distribution.set_std(None)
+        else:
+            self.delta_distribution.set_std(0)
+        delta_sample = self.delta_distribution.sample(delta_dist_info)
+        return torch.cat((one_hot, delta_sample), dim=-1)
 
 
 class QofMuMlpModel(torch.nn.Module):

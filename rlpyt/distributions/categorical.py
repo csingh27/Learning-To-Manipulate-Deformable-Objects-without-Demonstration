@@ -34,6 +34,11 @@ class Categorical(DiscreteMixin, Distribution):
         selected_likelihood = select_at_indexes(indexes, dist_info.prob)
         return torch.log(selected_likelihood + EPS)
 
+    def sample_loglikelihood(self, dist_info):
+        indexes = self.sample(dist_info)
+        log_likelihood = self.log_likelihood(indexes, dist_info)
+        return indexes, log_likelihood
+
     def likelihood_ratio(self, indexes, old_dist_info, new_dist_info):
         num = select_at_indexes(indexes, new_dist_info.prob)
         den = select_at_indexes(indexes, old_dist_info.prob)
