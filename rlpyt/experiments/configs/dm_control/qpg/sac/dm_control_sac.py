@@ -142,3 +142,89 @@ config['env']['domain'] = 'rope_v1'
 del config['env']['task_kwargs']
 
 configs["sac_state_ropev1"] = config
+
+config = dict(
+    agent=dict(
+        q_model_kwargs=dict(hidden_sizes=[256, 256]),
+        model_kwargs=dict(hidden_sizes=[256, 256]),
+    ),
+    algo=dict(
+        discount=0.99,
+        batch_size=1024,
+        target_update_tau=0.005,
+        target_update_interval=1,
+        learning_rate=6e-4,
+        reparameterize=True,
+        policy_output_regularization=0.0,
+        reward_scale=1,
+        replay_ratio=128,
+    ),
+    model=dict(),
+    optim=dict(),
+    runner=dict(
+        n_steps=5e5,
+        log_interval_steps=1e4,
+    ),
+    sampler=dict(
+        batch_T=1,
+        batch_B=16,
+        max_decorrelation_steps=0,
+        eval_n_envs=10,
+        eval_max_steps=20000,
+        eval_max_trajectories=50,
+    ),
+    env=dict(
+        domain='cloth_corner',
+        task='easy',
+        max_path_length=120,
+    ),
+)
+configs["sac_state_cloth_corner"] = config
+
+
+config = dict(
+    agent=dict(
+        ModelCls='PiConvModel',
+        QModelCls='QofMuConvModel',
+        q_model_kwargs=dict(channels=(64, 64, 64),
+                            kernel_sizes=(3, 3, 3), strides=(2, 2, 2),
+                            hidden_sizes=[256, 256]),
+        model_kwargs=dict(channels=(64, 64, 64),
+                          kernel_sizes=(3, 3, 3), strides=(2, 2, 2),
+                          hidden_sizes=[256, 256]),
+    ),
+    algo=dict(
+        discount=0.99,
+        batch_size=1024,
+        target_update_tau=0.005,
+        target_update_interval=1,
+        learning_rate=6e-4,
+        reparameterize=True,
+        policy_output_regularization=0.0,
+        reward_scale=1,
+        replay_ratio=128,
+    ),
+    model=dict(),
+    optim=dict(),
+    runner=dict(
+        n_steps=5e5,
+        log_interval_steps=1e4,
+    ),
+    sampler=dict(
+        is_pixel=True,
+        batch_T=1,
+        batch_B=16,
+        max_decorrelation_steps=0,
+        eval_n_envs=10,
+        eval_max_steps=20000,
+        eval_max_trajectories=50,
+    ),
+    env=dict(
+        domain='cloth_corner',
+        task='easy',
+        max_path_length=120,
+        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=True,
+                                  render_kwargs=dict(width=64, height=64))
+    ),
+)
+configs["sac_pixel_cloth_corner"] = config
