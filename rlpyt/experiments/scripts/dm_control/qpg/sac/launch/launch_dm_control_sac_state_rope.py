@@ -10,7 +10,7 @@ affinity_code = encode_affinity(
     contexts_per_gpu=1,
 )
 
-runs_per_setting = 4
+runs_per_setting = 8
 default_config_key = "sac_state_ropev1"
 experiment_title = "sac_dm_control_state_ropev1"
 variant_levels = list()

@@ -145,6 +145,7 @@ configs["sac_state_ropev1"] = config
 
 config = dict(
     agent=dict(
+        ModelCls='GumbelPiModel',
         q_model_kwargs=dict(hidden_sizes=[256, 256]),
         model_kwargs=dict(hidden_sizes=[256, 256]),
     ),
@@ -184,7 +185,7 @@ configs["sac_state_cloth_corner"] = config
 
 config = dict(
     agent=dict(
-        ModelCls='PiConvModel',
+        ModelCls='GumbelPiConvModel',
         QModelCls='QofMuConvModel',
         q_model_kwargs=dict(channels=(64, 64, 64),
                             kernel_sizes=(3, 3, 3), strides=(2, 2, 2),

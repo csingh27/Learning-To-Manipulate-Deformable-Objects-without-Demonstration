@@ -5,7 +5,8 @@ import torch.nn.functional as F
 
 from rlpyt.utils.tensor import infer_leading_dims, restore_leading_dims
 from rlpyt.models.mlp import MlpModel
-from rlpyt.distributions.gaussian import Gaussian, DistInfoStd, Categorical, DistInfo
+from rlpyt.distributions.gaussian import Gaussian, DistInfoStd
+from rlpyt.distributions.categorical import Categorical, DistInfo
 
 
 MIN_LOG_STD = -20

@@ -9,7 +9,8 @@ from rlpyt.models.mlp import MlpModel
 from rlpyt.models.conv2d import Conv2dHeadModel, Conv2dModel
 from rlpyt.models.qpg.mlp import AutoregPiMlpModel
 from rlpyt.models.preprocessor import get_preprocessor
-from rlpyt.distributions.gaussian import Gaussian, DistInfoStd, Categorical, DistInfo
+from rlpyt.distributions.gaussian import Gaussian, DistInfoStd
+from rlpyt.distributions.categorical import Categorical, DistInfo
 
 
 MIN_LOG_STD = -20
@@ -23,7 +24,7 @@ def _filter_name(fields, name):
     return fields
 
 
-class ConvModel(torch.nn.Module):
+class PiConvModel(torch.nn.Module):
 
     def __init__(
             self,
