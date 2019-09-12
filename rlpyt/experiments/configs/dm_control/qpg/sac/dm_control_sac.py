@@ -153,6 +153,8 @@ del config['env']['task_kwargs']
 configs["sac_pixels_ropev1"] = config
 
 config = dict(
+    sac_module='sac_v2',
+    sac_agent_module='sac_agent_v2',
     agent=dict(
         ModelCls='GumbelPiModel',
         q_model_kwargs=dict(hidden_sizes=[256, 256]),
@@ -193,6 +195,8 @@ configs["sac_state_cloth_corner"] = config
 
 
 config = dict(
+    sac_module='sac_v2',
+    sac_agent_module='sac_agent_v2',
     agent=dict(
         ModelCls='GumbelPiConvModel',
         QModelCls='QofMuConvModel',
@@ -234,7 +238,8 @@ config = dict(
         task='easy',
         max_path_length=120,
         pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=True,
-                                  render_kwargs=dict(width=64, height=64))
+                                  render_kwargs=dict(width=64, height=64)),
+        task_kwargs=dict(random_location=True)
     ),
 )
 configs["sac_pixel_cloth_corner"] = config

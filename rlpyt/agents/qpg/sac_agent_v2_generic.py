@@ -6,7 +6,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.nn.parallel import DistributedDataParallelCPU as DDPC
 
 from rlpyt.agents.base import BaseAgent, AgentStep
-from rlpyt.models.qpg.mlp import QofMuMlpModel, PiMlpModel
+from rlpyt.models.qpg.mlp import QofMuMlpModel, PiMlpModel, GumbelPiMlpModel
 from rlpyt.utils.quick_args import save__init__args
 from rlpyt.utils.buffer import buffer_to
 from rlpyt.utils.logging import logger

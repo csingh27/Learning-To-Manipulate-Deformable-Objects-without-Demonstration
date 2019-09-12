@@ -231,12 +231,12 @@ class GumbelPiConvModel(torch.nn.Module):
         assert all([len(getattr(observation_shape, f)) == 1 for f in fields]), observation_shape
         extra_input_size = sum([getattr(observation_shape, f)[0] for f in fields])
         self.conv = Conv2dHeadModel(observation_shape.pixels, channels, kernel_sizes,
-                                    strides, hidden_sizes, output_size=2 * 12 + 4,
+                                    strides, hidden_sizes, output_size=2 * 3 + 4,
                                     paddings=paddings,
                                     nonlinearity=nonlinearity, use_maxpool=False,
                                     extra_input_size=extra_input_size)
         self.delta_distribution = Gaussian(
-            dim=12,
+            dim=3,
             squash=self.action_squash,
             min_std=np.exp(MIN_LOG_STD),
             max_std=np.exp(MAX_LOG_STD),
