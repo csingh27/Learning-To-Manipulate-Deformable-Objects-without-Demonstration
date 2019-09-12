@@ -167,7 +167,7 @@ class AutoregPiConvModel(torch.nn.Module):
             mu, log_std = restore_leading_dims((mu, log_std), lead_dim, T, B)
 
             self._counter += 1
-            return DistInfoStd(mu=mu, log_std=log_std)
+            return DistInfoStd(mean=mu, log_std=log_std)
         else:
             raise Exception('Invalid self._counter', self._counter)
 

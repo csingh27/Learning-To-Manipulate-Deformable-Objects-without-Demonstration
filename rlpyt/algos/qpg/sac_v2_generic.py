@@ -42,6 +42,7 @@ class SAC(RlAlgorithm):
             optim_kwargs=None,
             initial_optim_state_dict=None,  # for pi only.
             action_prior="uniform",  # or "gaussian"
+            policy_output_regularization=0.001,
             reward_scale=1,
             reparameterize=True,
             clip_grad_norm=1e9,

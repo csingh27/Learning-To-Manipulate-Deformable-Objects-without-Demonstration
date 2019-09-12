@@ -17,7 +17,7 @@ from rlpyt.utils.collections import namedarraytuple
 MIN_LOG_STD = -20
 MAX_LOG_STD = 2
 
-AgentInfo = namedarraytuple("AgentInfo", ["dist_info"])
+AgentInfo = namedarraytuple("AgentInfo", [])
 Models = namedtuple("Models", ["pi", "q1", "q2"])
 
 
@@ -136,7 +136,7 @@ class SacAgent(BaseAgent):
             device=self.device)
         dist_info = self.model(*model_inputs)
         action = self.model.sample(dist_info)
-        agent_info = AgentInfo(dist_info=dist_info)
+        agent_info = AgentInfo()
         action, agent_info = buffer_to((action, agent_info), device="cpu")
         return AgentStep(action=action, agent_info=agent_info)
 

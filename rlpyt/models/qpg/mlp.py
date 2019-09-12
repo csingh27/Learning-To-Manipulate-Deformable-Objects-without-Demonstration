@@ -1,4 +1,5 @@
 
+from collections import namedtuple
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -135,6 +136,7 @@ class AutoregPiMlpModel(torch.nn.Module):
         return self._counter < 2
 
 
+GumbelDistInfo = namedtuple('GumbelDistInfo', ['cat_dist', 'delta_dist'])
 class GumbelPiMlpModel(torch.nn.Module):
     """For picking corners"""
 
@@ -152,16 +154,16 @@ class GumbelPiMlpModel(torch.nn.Module):
         self.mlp = MlpModel(
             input_size=input_dim,
             hidden_sizes=hidden_sizes,
-            output_size=12 * 2 + 4, # 3 for each corners, times two for std, 4 probs
+            output_size=3 * 2 + 4, # 3 for each corners, times two for std, 4 probs
         )
 
         self.delta_distribution = Gaussian(
-            dim=12,
-            squash=self.action_squash,
+            dim=3,
+            squash=True,
             min_std=np.exp(MIN_LOG_STD),
             max_std=np.exp(MAX_LOG_STD),
         )
-        self.cat_distribution = Categorical()
+        self.cat_distribution = Categorical(4)
 
 
     def forward(self, observation, prev_action, prev_reward):
@@ -172,14 +174,16 @@ class GumbelPiMlpModel(torch.nn.Module):
             self._obs_ndim)
         output = self.mlp(observation.view(T * B, -1))
         prob = F.softmax(output[:, :4] / 10., dim=-1)
-        mu, log_std = output[:, 4:4 + self._action_size], output[:, 4 + self._action_size:]
+        mu, log_std = output[:, 4:4 + 3], output[:, 4 + 3:]
         prob, mu, log_std = restore_leading_dims((prob, mu, log_std), lead_dim, T, B)
-        return DistInfo(prob=prob), DistInfoStd(mu=mu, log_std=log_std)
+        return GumbelDistInfo(cat_dist=DistInfo(prob=prob), delta_dist=DistInfoStd(mean=mu, log_std=log_std))
 
     def sample_loglikelihood(self, dist_info):
-        cat_dist_info, delta_dist_info = dist_info
+        cat_dist_info, delta_dist_info = dist_info.cat_dist, dist_info.delta_dist
+
         cat_sample, cat_loglikelihood = self.cat_distribution.sample_loglikelihood(cat_dist_info)
         one_hot = torch.zeros_like(cat_dist_info.prob)
+        cat_sample = cat_sample.unsqueeze(-1)
         one_hot.scatter_(1, cat_sample, 1)
         one_hot = (one_hot - cat_dist_info.prob).detach() + cat_dist_info.prob # Make action differentiable through prob
 
@@ -189,13 +193,14 @@ class GumbelPiMlpModel(torch.nn.Module):
         return action, log_likelihood
 
     def sample(self, dist_info):
-        cat_dist_info, delta_dist_info = dist_info
+        cat_dist_info, delta_dist_info = dist_info.cat_dist, dist_info.delta_dist
         if self.training:
             cat_sample = self.cat_distribution.sample(cat_dist_info)
         else:
             cat_sample = torch.max(cat_dist_info.prob, dim=-1)[1].view(-1)
+        cat_sample = cat_sample.unsqueeze(-1)
         one_hot = torch.zeros_like(cat_dist_info.prob)
-        one_hot.scatter_(1, cat_sample, 1)
+        one_hot.scatter_(-1, cat_sample, 1)
 
         if self.training:
             self.delta_distribution.set_std(None)

@@ -156,7 +156,7 @@ config = dict(
     sac_module='sac_v2',
     sac_agent_module='sac_agent_v2',
     agent=dict(
-        ModelCls='GumbelPiModel',
+        ModelCls='GumbelPiMlpModel',
         q_model_kwargs=dict(hidden_sizes=[256, 256]),
         model_kwargs=dict(hidden_sizes=[256, 256]),
     ),
@@ -179,7 +179,7 @@ config = dict(
     ),
     sampler=dict(
         batch_T=1,
-        batch_B=16,
+        batch_B=32,
         max_decorrelation_steps=0,
         eval_n_envs=10,
         eval_max_steps=20000,
@@ -189,6 +189,7 @@ config = dict(
         domain='cloth_corner',
         task='easy',
         max_path_length=120,
+        task_kwargs=dict(random_location=True)
     ),
 )
 configs["sac_state_cloth_corner"] = config
@@ -227,7 +228,7 @@ config = dict(
     sampler=dict(
         is_pixel=True,
         batch_T=1,
-        batch_B=16,
+        batch_B=32,
         max_decorrelation_steps=0,
         eval_n_envs=10,
         eval_max_steps=20000,
