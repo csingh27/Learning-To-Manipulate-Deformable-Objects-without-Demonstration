@@ -46,6 +46,7 @@ class PiConvModel(torch.nn.Module):
         self._obs_ndim = 3
         self._action_size = action_size
         self._image_shape = observation_shape.pixels
+        print('observation_shape', observation_shape)
 
         self.preprocessor = get_preprocessor('image')
 
@@ -174,8 +175,9 @@ class AutoregPiConvModel(torch.nn.Module):
     def sample_loglikelihood(self, dist_info):
         if isinstance(dist_info, DistInfo):
             sample, log_likelihood = self.cat_distribution.sample_loglikelihood(dist_info)
+            sample = sample.unsqueeze(-1)
             one_hot = torch.zeros_like(dist_info.prob)
-            one_hot.scatter_(1, sample, 1)
+            one_hot.scatter_(-1, sample, 1)
             rtn = (one_hot - dist_info.prob).detach() + dist_info.prob
         elif isinstance(dist_info, DistInfoStd):
             rtn = self.delta_distribution.sample(dist_info)
@@ -189,8 +191,9 @@ class AutoregPiConvModel(torch.nn.Module):
                 sample = self.cat_distribution.sample(dist_info)
             else:
                 sample = torch.max(dist_info.prob, dim=-1)[1].view(-1)
+            sample = sample.unsqueeze(-1)
             one_hot = torch.zeros_like(dist_info.prob)
-            one_hot.scatter_(1, sample, 1)
+            one_hot.scatter_(-1, sample, 1)
             sample = one_hot
         elif isinstance(dist_info, DistInfoStd):
             if self.training:
@@ -225,11 +228,14 @@ class GumbelPiConvModel(torch.nn.Module):
         self._action_size = action_size
         self._image_shape = observation_shape.pixels
 
+        print('observation shape', observation_shape)
+
         self.preprocessor = get_preprocessor('image')
 
         fields = _filter_name(observation_shape._fields, 'pixels')
         assert all([len(getattr(observation_shape, f)) == 1 for f in fields]), observation_shape
         extra_input_size = sum([getattr(observation_shape, f)[0] for f in fields])
+        self._extra_input_size = extra_input_size
         self.conv = Conv2dHeadModel(observation_shape.pixels, channels, kernel_sizes,
                                     strides, hidden_sizes, output_size=2 * 3 + 4,
                                     paddings=paddings,
@@ -237,32 +243,37 @@ class GumbelPiConvModel(torch.nn.Module):
                                     extra_input_size=extra_input_size)
         self.delta_distribution = Gaussian(
             dim=3,
-            squash=self.action_squash,
+            squash=True,
             min_std=np.exp(MIN_LOG_STD),
             max_std=np.exp(MAX_LOG_STD),
         )
-        self.cat_distribution = Categorical()
+        self.cat_distribution = Categorical(4)
 
     def forward(self, observation, prev_action, prev_reward):
         pixel_obs = self.preprocessor(observation.pixels)
         lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
 
         pixel_obs = pixel_obs.view(T * B, *self._image_shape)
-        fields = _filter_name(observation._fields, 'pixels')
-        extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
-                                 for f in fields], dim=-1)
+
+        if self._extra_input_size > 0:
+            fields = _filter_name(observation._fields, 'pixels')
+            extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
+                                     for f in fields], dim=-1)
+        else:
+            extra_input = None
 
         output = self.conv(pixel_obs, extra_input=extra_input)
         prob = F.softmax(output[:, :4] / 10., dim=-1)
-        mu, log_std = output[:, 4:4 + self._action_size], output[:, 4 + self._action_size:]
+        mu, log_std = output[:, 4:4 + 3], output[:, 4 + 3:]
         prob, mu, log_std = restore_leading_dims((prob, mu, log_std), lead_dim, T, B)
-        return DistInfo(prob=prob), DistInfoStd(mu=mu, log_std=log_std)
+        return DistInfo(prob=prob), DistInfoStd(mean=mu, log_std=log_std)
 
     def sample_loglikelihood(self, dist_info):
         cat_dist_info, delta_dist_info = dist_info
         cat_sample, cat_loglikelihood = self.cat_distribution.sample_loglikelihood(cat_dist_info)
+        cat_sample = cat_sample.unsqueeze(-1)
         one_hot = torch.zeros_like(cat_dist_info.prob)
-        one_hot.scatter_(1, cat_sample, 1)
+        one_hot.scatter_(-1, cat_sample, 1)
         one_hot = (one_hot - cat_dist_info.prob).detach() + cat_dist_info.prob # Make action differentiable through prob
 
         delta_sample, delta_loglikelihood = self.delta_distribution.sample_loglikelihood(delta_dist_info)
@@ -276,8 +287,9 @@ class GumbelPiConvModel(torch.nn.Module):
             cat_sample = self.cat_distribution.sample(cat_dist_info)
         else:
             cat_sample = torch.max(cat_dist_info.prob, dim=-1)[1].view(-1)
+        cat_sample = cat_sample.unsqueeze(-1)
         one_hot = torch.zeros_like(cat_dist_info.prob)
-        one_hot.scatter_(1, cat_sample, 1)
+        one_hot.scatter_(-1, cat_sample, 1)
 
         if self.training:
             self.delta_distribution.set_std(None)

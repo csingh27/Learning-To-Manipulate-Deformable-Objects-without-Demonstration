@@ -196,6 +196,8 @@ configs["sac_state_cloth_corner"] = config
 
 
 config = dict(
+    state_keys=None,
+    info_keys=None,
     sac_module='sac_v2',
     sac_agent_module='sac_agent_v2',
     agent=dict(
@@ -228,7 +230,7 @@ config = dict(
     sampler=dict(
         is_pixel=True,
         batch_T=1,
-        batch_B=32,
+        batch_B=16,
         max_decorrelation_steps=0,
         eval_n_envs=10,
         eval_max_steps=20000,
@@ -238,9 +240,9 @@ config = dict(
         domain='cloth_corner',
         task='easy',
         max_path_length=120,
-        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=True,
+        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
                                   render_kwargs=dict(width=64, height=64)),
-        task_kwargs=dict(random_location=True)
+        task_kwargs=dict(random_location=True, pixels_only=True) # to not return positions and only pick location
     ),
 )
-configs["sac_pixel_cloth_corner"] = config
+configs["sac_pixels_cloth_corner"] = config
