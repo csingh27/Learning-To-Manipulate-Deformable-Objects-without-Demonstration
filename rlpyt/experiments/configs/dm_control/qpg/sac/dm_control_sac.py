@@ -158,7 +158,7 @@ config = dict(
     agent=dict(
         ModelCls='GumbelPiMlpModel',
         q_model_kwargs=dict(hidden_sizes=[256, 256]),
-        model_kwargs=dict(hidden_sizes=[256, 256]),
+        model_kwargs=dict(hidden_sizes=[256, 256], all_corners=True),
     ),
     algo=dict(
         discount=0.99,
