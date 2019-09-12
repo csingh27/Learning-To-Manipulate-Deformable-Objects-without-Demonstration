@@ -18,7 +18,7 @@ from rlpyt.utils.collections import namedarraytuple
 MIN_LOG_STD = -20
 MAX_LOG_STD = 2
 
-AgentInfo = namedarraytuple("AgentInfo", ["dist_info"])
+AgentInfo = namedarraytuple("AgentInfo", [])
 Models = namedtuple("Models", ["pi", "q1", "q2"])
 
 
@@ -121,21 +121,15 @@ class SacAgent(BaseAgent):
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
 
-        actions, means, log_stds = [], [], []
+        actions, dist_info = [], []
         log_pi_total = 0
         self.model.start()
         while self.model.has_next():
-            mean, log_std = self.model.next(actions, *model_inputs)
-            dist_info = DistInfoStd(mean=mean, log_std=log_std)
-            action, log_pi = self.distribution.sample_loglikelihood(dist_info)
+            dist_info.append(self.model.next(actions, *model_inputs))
+            action, log_pi = self.distribution.sample_loglikelihood(dist_info[-1])
 
             log_pi_total += log_pi
             actions.append(action)
-            means.append(mean)
-            log_stds.append(log_std)
-
-        mean, log_std = torch.cat(means, dim=-1), torch.cat(log_stds, dim=-1)
-        dist_info = DistInfoStd(mean=mean, log_std=log_std)
 
         log_pi_total, dist_info = buffer_to((log_pi_total, dist_info), device="cpu")
         action = torch.cat(actions, dim=-1)
@@ -158,20 +152,14 @@ class SacAgent(BaseAgent):
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
 
-        actions, means, log_stds = [], [], []
+        actions, dist_info = [], []
         self.model.start()
         while self.model.has_next():
-            mean, log_std = self.model.next(actions, *model_inputs)
-            dist_info = DistInfoStd(mean=mean, log_std=log_std)
-            action = self.distribution.sample(dist_info)
-
+            dist_info.append(self.model.next(actions, *model_inputs))
+            action = self.distribution.sample(dist_info[-1])
             actions.append(action)
-            means.append(mean)
-            log_stds.append(log_std)
 
-        mean, log_std = torch.cat(means, dim=-1), torch.cat(log_stds, dim=-1)
-        dist_info = DistInfoStd(mean=mean, log_std=log_std)
-        agent_info = AgentInfo(dist_info=dist_info)
+        agent_info = AgentInfo()
 
         action = torch.cat(actions, dim=-1)
         action, agent_info = buffer_to((action, agent_info), device="cpu")

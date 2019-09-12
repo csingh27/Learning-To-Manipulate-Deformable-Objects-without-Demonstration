@@ -172,6 +172,9 @@ class AutoregPiConvModel(torch.nn.Module):
         else:
             raise Exception('Invalid self._counter', self._counter)
 
+    def has_next(self):
+        return self._counter < 2
+
     def sample_loglikelihood(self, dist_info):
         if isinstance(dist_info, DistInfo):
             sample, log_likelihood = self.cat_distribution.sample_loglikelihood(dist_info)
