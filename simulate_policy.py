@@ -1,5 +1,6 @@
 
 from os.path import join
+import importlib
 import argparse
 import json
 
@@ -7,7 +8,6 @@ import torch
 import numpy as np
 
 from rlpyt.envs.dm_control_env import DMControlEnv
-from rlpyt.agents.qpg.sac_agent_v2 import SacAgent
 from rlpyt.samplers.serial.sampler import SerialSampler
 
 
@@ -31,6 +31,11 @@ def main():
 
     agent_state_dict = params['agent_state_dict']
     optimizer_state_dict = params['optimizer_state_dict']
+
+
+    sac_agent_module = 'rlpyt.agents.qpg.{}'.format(config['sac_agent_module'])
+    sac_agent_module = importlib.import_module(sac_agent_module)
+    SacAgent = sac_agent_module.SacAgent
 
     agent = SacAgent(**config["agent"])
     sampler = SerialSampler(

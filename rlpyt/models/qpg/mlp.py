@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from rlpyt.utils.tensor import infer_leading_dims, restore_leading_dims
+from rlpyt.utils.tensor import infer_leading_dims, restore_leading_dims, to_onehot, select_at_indexes
 from rlpyt.models.mlp import MlpModel
 from rlpyt.distributions.gaussian import Gaussian, DistInfoStd
 from rlpyt.distributions.categorical import Categorical, DistInfo
@@ -154,6 +154,7 @@ class GumbelPiMlpModel(torch.nn.Module):
 
         print('all corners', self._all_corners)
         delta_dim = 12 if all_corners else 3
+        self._delta_dim = delta_dim
         self.mlp = MlpModel(
             input_size=input_dim,
             hidden_sizes=hidden_sizes,
@@ -176,23 +177,28 @@ class GumbelPiMlpModel(torch.nn.Module):
         lead_dim, T, B, _ = infer_leading_dims(observation,
             self._obs_ndim)
         output = self.mlp(observation.view(T * B, -1))
-        prob = F.softmax(output[:, :4] / 10., dim=-1)
-        mu, log_std = output[:, 4:4 + 3], output[:, 4 + 3:]
-        prob, mu, log_std = restore_leading_dims((prob, mu, log_std), lead_dim, T, B)
-        return GumbelDistInfo(cat_dist=DistInfo(prob=prob), delta_dist=DistInfoStd(mean=mu, log_std=log_std))
+        logits = output[:, :4]
+        mu, log_std = output[:, 4:4 + self._delta_dim], output[:, 4 + self._delta_dim:]
+        logits, mu, log_std = restore_leading_dims((logits, mu, log_std), lead_dim, T, B)
+        return GumbelDistInfo(cat_dist=logits, delta_dist=DistInfoStd(mean=mu, log_std=log_std))
 
     def sample_loglikelihood(self, dist_info):
-        cat_dist_info, delta_dist_info = dist_info.cat_dist, dist_info.delta_dist
+        logits, delta_dist_info = dist_info.cat_dist, dist_info.delta_dist
 
-        cat_sample, cat_loglikelihood = self.cat_distribution.sample_loglikelihood(cat_dist_info)
-        one_hot = torch.zeros_like(cat_dist_info.prob)
-        cat_sample = cat_sample.unsqueeze(-1)
-        one_hot.scatter_(1, cat_sample, 1)
-        one_hot = (one_hot - cat_dist_info.prob).detach() + cat_dist_info.prob # Make action differentiable through prob
+        u = torch.rand_like(logits)
+        u = torch.clamp(u, 1e-5, 1 - 1e-5)
+        gumbel = -torch.log(-torch.log(u))
+        prob = F.softmax((logits + gumbel) / 10, dim=-1)
+
+        cat_sample = torch.argmax(prob, dim=-1)
+        cat_loglikelihood = select_at_indexes(cat_sample, prob)
+
+        one_hot = to_onehot(cat_sample, 4, dtype=torch.float32)
+        one_hot = (one_hot - prob).detach() + prob # Make action differentiable through prob
 
         if self._all_corners:
             mu, log_std = delta_dist_info.mean, delta_dist_info.log_std
-            mu, log_std = mu.view(mu.shape[0], 4, 3), log_std.view(log_std.shape[0], 4, 3)
+            mu, log_std = mu.view(-1, 4, 3), log_std.view(-1, 4, 3)
             mu = mu[torch.arange(len(cat_sample)), cat_sample.squeeze(-1)]
             log_std = log_std[torch.arange(len(cat_sample)), cat_sample.squeeze(-1)]
             new_dist_info = DistInfoStd(mean=mu, log_std=log_std)
@@ -205,20 +211,27 @@ class GumbelPiMlpModel(torch.nn.Module):
         return action, log_likelihood
 
     def sample(self, dist_info):
-        cat_dist_info, delta_dist_info = dist_info.cat_dist, dist_info.delta_dist
-        if self.training:
-            cat_sample = self.cat_distribution.sample(cat_dist_info)
-        else:
-            cat_sample = torch.max(cat_dist_info.prob, dim=-1)[1].view(-1)
-        cat_sample = cat_sample.unsqueeze(-1)
-        one_hot = torch.zeros_like(cat_dist_info.prob)
-        one_hot.scatter_(-1, cat_sample, 1)
+        logits, delta_dist_info = dist_info.cat_dist, dist_info.delta_dist
+        u = torch.rand_like(logits)
+        u = torch.clamp(u, 1e-5, 1 - 1e-5)
+        gumbel = -torch.log(-torch.log(u))
+        prob = F.softmax((logits + gumbel) / 10, dim=-1)
+
+        cat_sample = torch.argmax(prob, dim=-1)
+        one_hot = to_onehot(cat_sample, 4, dtype=torch.float32)
+
+        if len(prob.shape) == 1: # Edge case for when it gets buffer shapes
+            cat_sample = cat_sample.unsqueeze(0)
 
         if self._all_corners:
             mu, log_std = delta_dist_info.mean, delta_dist_info.log_std
-            mu, log_std = mu.view(mu.shape[0], 4, 3), log_std.view(log_std.shape[0], 4, 3)
-            mu = mu[torch.arange(len(cat_sample)), cat_sample.squeeze(-1)]
-            log_std = log_std[torch.arange(len(cat_sample)), cat_sample.squeeze(-1)]
+            mu, log_std = mu.view(-1, 4, 3), log_std.view(-1, 4, 3)
+            mu = select_at_indexes(cat_sample, mu)
+            log_std = select_at_indexes(cat_sample, log_std)
+
+            if len(prob.shape) == 1: # Edge case for when it gets buffer shapes
+                mu, log_std = mu.squeeze(0), log_std.squeeze(0)
+
             new_dist_info = DistInfoStd(mean=mu, log_std=log_std)
         else:
             new_dist_info = delta_dist_info
