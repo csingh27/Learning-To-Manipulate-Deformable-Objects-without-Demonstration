@@ -13,7 +13,7 @@ def cloth_corner_random(obs):
     one_hot[idx] = 1
 
     delta = np.random.rand(3) * 2 - 1
-    return np.concatenate(one_hot, delta).astype(np.float32)
+    return np.concatenate((one_hot, delta)).astype(np.float32)
 
 
 def rope_v1_random(obs):
@@ -32,7 +32,7 @@ def simulate_policy():
     n_episodes = 10
     returns = []
 
-    for _ in range(n_episodes):
+    for i in range(n_episodes):
         o = env.reset()
         done = False
         reward = 0
@@ -41,9 +41,10 @@ def simulate_policy():
             o, r, done, info = env.step(policy(o))
             reward += r
 
-            if done or info['traj_done']:
+            if done or info.traj_done:
                 break
         returns.append(reward)
+        print('Finished episode', i)
 
     print('Rewards', returns)
     print('Average Reward', np.mean(returns))
