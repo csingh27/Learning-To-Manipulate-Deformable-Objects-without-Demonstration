@@ -6,9 +6,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.nn.parallel import DistributedDataParallelCPU as DDPC
 
 from rlpyt.agents.base import BaseAgent, AgentStep
-from rlpyt.models.qpg.mlp import QofMuMlpModel, AutoregPiMlpModel
+from rlpyt.models.qpg.mlp import QofMuMlpModel, AutoregPiMlpModel, GumbelAutoregPiMlpModel
 from rlpyt.utils.quick_args import save__init__args
-from rlpyt.distributions.gaussian import Gaussian, DistInfoStd
 from rlpyt.utils.buffer import buffer_to
 from rlpyt.utils.logging import logger
 from rlpyt.models.utils import update_state_dict
@@ -72,12 +71,6 @@ class SacAgent(BaseAgent):
         if self.initial_model_state_dict is not None:
             self.load_state_dict(self.initial_model_state_dict)
         assert len(env_spaces.action.shape) == 1
-        self.distribution = Gaussian(
-            dim=env_spaces.action.shape[0],
-            squash=self.action_squash,
-            min_std=np.exp(MIN_LOG_STD),
-            max_std=np.exp(MAX_LOG_STD),
-        )
 
     def to_device(self, cuda_idx=None):
         super().to_device(cuda_idx)
@@ -126,14 +119,14 @@ class SacAgent(BaseAgent):
         self.model.start()
         while self.model.has_next():
             dist_info.append(self.model.next(actions, *model_inputs))
-            action, log_pi = self.distribution.sample_loglikelihood(dist_info[-1])
+            action, log_pi = self.model.sample_loglikelihood(dist_info[-1])
 
             log_pi_total += log_pi
             actions.append(action)
 
-        log_pi_total, dist_info = buffer_to((log_pi_total, dist_info), device="cpu")
+        log_pi_total = buffer_to(log_pi_total, device="cpu")
         action = torch.cat(actions, dim=-1)
-        return action, log_pi_total, dist_info  # Action stays on device for q models.
+        return action, log_pi_total, None  # Action stays on device for q models.
 
     def target_v(self, observation, prev_action, prev_reward):
         model_inputs = buffer_to((observation, prev_action, prev_reward),
@@ -156,7 +149,7 @@ class SacAgent(BaseAgent):
         self.model.start()
         while self.model.has_next():
             dist_info.append(self.model.next(actions, *model_inputs))
-            action = self.distribution.sample(dist_info[-1])
+            action = self.model.sample(dist_info[-1])
             actions.append(action)
 
         agent_info = AgentInfo()
@@ -200,14 +193,11 @@ class SacAgent(BaseAgent):
             logger.log(f"Agent at itr {itr}, sample std: {self.pretrain_std}")
         if itr == self.min_itr_learn:
             logger.log(f"Agent at itr {itr}, sample std: learned.")
-        std = None if itr >= self.min_itr_learn else self.pretrain_std
-        self.distribution.set_std(std)  # If None: std from policy dist_info.
 
     def eval_mode(self, itr):
         super().eval_mode(itr)
         self.q1_model.eval()
         self.q2_model.eval()
-        self.distribution.set_std(0.)  # Deterministic (dist_info std ignored).
 
     def state_dict(self):
         return dict(

@@ -279,35 +279,36 @@ class GumbelAutoregPiMlpModel(torch.nn.Module):
         return self._counter < 2
 
     def sample_loglikelihood(self, dist_info):
-        cat_dist_info, delta_dist_info = dist_info.cat_dist, dist_info.delta_dist
+        if isinstance(dist_info, DistInfo):
+            cat_sample, log_likelihood = self.cat_distribution.sample_loglikelihood(dist_info)
+            one_hot = torch.zeros_like(dist_info.prob)
+            cat_sample = cat_sample.unsqueeze(-1)
+            one_hot.scatter_(1, cat_sample, 1)
+            action = (one_hot - dist_info.prob).detach() + dist_info.prob  # Make action differentiable through prob
+        elif isinstance(dist_info, DistInfoStd):
+            action, log_likelihood = self.delta_distribution.sample_loglikelihood(dist_info)
+        else:
+            raise Exception()
 
-        cat_sample, cat_loglikelihood = self.cat_distribution.sample_loglikelihood(cat_dist_info)
-        one_hot = torch.zeros_like(cat_dist_info.prob)
-        cat_sample = cat_sample.unsqueeze(-1)
-        one_hot.scatter_(1, cat_sample, 1)
-        one_hot = (one_hot - cat_dist_info.prob).detach() + cat_dist_info.prob  # Make action differentiable through prob
-
-        delta_sample, delta_loglikelihood = self.delta_distribution.sample_loglikelihood(delta_dist_info)
-        action = torch.cat((one_hot, delta_sample), dim=-1)
-        log_likelihood = cat_loglikelihood + delta_loglikelihood
         return action, log_likelihood
 
     def sample(self, dist_info):
-        cat_dist_info, delta_dist_info = dist_info.cat_dist, dist_info.delta_dist
-        if self.training:
-            cat_sample = self.cat_distribution.sample(cat_dist_info)
-        else:
-            cat_sample = torch.max(cat_dist_info.prob, dim=-1)[1].view(-1)
-        cat_sample = cat_sample.unsqueeze(-1)
-        one_hot = torch.zeros_like(cat_dist_info.prob)
-        one_hot.scatter_(-1, cat_sample, 1)
-
-        if self.training:
-            self.delta_distribution.set_std(None)
-        else:
-            self.delta_distribution.set_std(0)
-        delta_sample = self.delta_distribution.sample(delta_dist_info)
-        return torch.cat((one_hot, delta_sample), dim=-1)
+        if isinstance(dist_info, DistInfo):
+            if self.training:
+                cat_sample = self.cat_distribution.sample(dist_info)
+            else:
+                cat_sample = torch.max(dist_info.prob, dim=-1)[1].view(-1)
+            cat_sample = cat_sample.unsqueeze(-1)
+            one_hot = torch.zeros_like(dist_info.prob)
+            one_hot.scatter_(-1, cat_sample, 1)
+            action = one_hot
+        elif isinstance(dist_info, DistInfoStd):
+            if self.training:
+                self.delta_distribution.set_std(None)
+            else:
+                self.delta_distribution.set_std(0)
+            action = self.delta_distribution.sample(dist_info)
+        return action
 
 
 
