@@ -145,20 +145,23 @@ class GumbelPiMlpModel(torch.nn.Module):
             observation_shape,
             hidden_sizes,
             action_size,
+            all_corners=False
             ):
         super().__init__()
         self._obs_ndim = 1
+        self._all_corners = all_corners
         input_dim = int(np.sum(observation_shape))
 
-        self._action_size = action_size
+        print('all corners', self._all_corners)
+        delta_dim = 12 if all_corners else 3
         self.mlp = MlpModel(
             input_size=input_dim,
             hidden_sizes=hidden_sizes,
-            output_size=3 * 2 + 4, # 3 for each corners, times two for std, 4 probs
+            output_size=2 * delta_dim + 4, # 3 for each corners, times two for std, 4 probs
         )
 
         self.delta_distribution = Gaussian(
-            dim=3,
+            dim=delta_dim,
             squash=True,
             min_std=np.exp(MIN_LOG_STD),
             max_std=np.exp(MAX_LOG_STD),
@@ -187,7 +190,16 @@ class GumbelPiMlpModel(torch.nn.Module):
         one_hot.scatter_(1, cat_sample, 1)
         one_hot = (one_hot - cat_dist_info.prob).detach() + cat_dist_info.prob # Make action differentiable through prob
 
-        delta_sample, delta_loglikelihood = self.delta_distribution.sample_loglikelihood(delta_dist_info)
+        if self._all_corners:
+            mu, log_std = delta_dist_info.mean, delta_dist_info.log_std
+            mu, log_std = mu.view(mu.shape[0], 4, 3), log_std.view(log_std.shape[0], 4, 3)
+            mu = mu[torch.arange(len(cat_sample)), cat_sample.squeeze(-1)]
+            log_std = log_std[torch.arange(len(cat_sample)), cat_sample.squeeze(-1)]
+            new_dist_info = DistInfoStd(mean=mu, log_std=log_std)
+        else:
+            new_dist_info = delta_dist_info
+
+        delta_sample, delta_loglikelihood = self.delta_distribution.sample_loglikelihood(new_dist_info)
         action = torch.cat((one_hot, delta_sample), dim=-1)
         log_likelihood = cat_loglikelihood + delta_loglikelihood
         return action, log_likelihood
@@ -202,11 +214,20 @@ class GumbelPiMlpModel(torch.nn.Module):
         one_hot = torch.zeros_like(cat_dist_info.prob)
         one_hot.scatter_(-1, cat_sample, 1)
 
+        if self._all_corners:
+            mu, log_std = delta_dist_info.mean, delta_dist_info.log_std
+            mu, log_std = mu.view(mu.shape[0], 4, 3), log_std.view(log_std.shape[0], 4, 3)
+            mu = mu[torch.arange(len(cat_sample)), cat_sample.squeeze(-1)]
+            log_std = log_std[torch.arange(len(cat_sample)), cat_sample.squeeze(-1)]
+            new_dist_info = DistInfoStd(mean=mu, log_std=log_std)
+        else:
+            new_dist_info = delta_dist_info
+
         if self.training:
             self.delta_distribution.set_std(None)
         else:
             self.delta_distribution.set_std(0)
-        delta_sample = self.delta_distribution.sample(delta_dist_info)
+        delta_sample = self.delta_distribution.sample(new_dist_info)
         return torch.cat((one_hot, delta_sample), dim=-1)
 
 
