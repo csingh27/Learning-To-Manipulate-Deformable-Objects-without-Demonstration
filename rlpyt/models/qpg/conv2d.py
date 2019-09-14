@@ -61,10 +61,10 @@ class PiConvModel(torch.nn.Module):
                                     extra_input_size=extra_input_size)
 
     def forward(self, observation, prev_action, prev_reward):
-        pixel_obs = self.preprocessor(observation.pixels)
+        pixel_obs = observation.pixels
         lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
-
-        pixel_obs = pixel_obs.view(T * B, *pixel_obs.shape[-3:])
+        pixel_obs = pixel_obs.view(T * B, *self._image_shape)
+        pixel_obs = self.preprocessor(pixel_obs)
         fields = _filter_name(observation._fields, 'pixels')
 
         if self._extra_input_size > 0:
@@ -142,10 +142,10 @@ class AutoregPiConvModel(torch.nn.Module):
         self._counter = 0
 
     def next(self, actions, observation, prev_action, prev_reward):
-        pixel_obs = self.preprocessor(observation.pixels)
+        pixel_obs = observation.pixels
         lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
-
         pixel_obs = pixel_obs.view(T * B, *self._image_shape)
+        pixel_obs = self.preprocessor(observation.pixels)
         embedding = self.conv(pixel_obs)
 
         if self._counter == 0:
@@ -253,10 +253,10 @@ class GumbelPiConvModel(torch.nn.Module):
         self.cat_distribution = Categorical(4)
 
     def forward(self, observation, prev_action, prev_reward):
-        pixel_obs = self.preprocessor(observation.pixels)
+        pixel_obs = observation.pixels
         lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
-
         pixel_obs = pixel_obs.view(T * B, *self._image_shape)
+        pixel_obs = self.preprocessor(observation.pixels)
 
         if self._extra_input_size > 0:
             fields = _filter_name(observation._fields, 'pixels')
@@ -338,10 +338,10 @@ class QofMuConvModel(torch.nn.Module):
                                     extra_input_size=extra_input_size + action_size * n_tile)
 
     def forward(self, observation, prev_action, prev_reward, action):
-        pixel_obs = self.preprocessor(observation.pixels)
+        pixel_obs = observation.pixels
         lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
-
-        pixel_obs = pixel_obs.view(T * B, *pixel_obs.shape[-3:])
+        pixel_obs = pixel_obs.view(T * B, *self._image_shape)
+        pixel_obs = self.preprocessor(pixel_obs)
         fields = _filter_name(observation._fields, 'pixels')
         action = action.view(T * B, -1).repeat(1, self._n_tile)
         extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
