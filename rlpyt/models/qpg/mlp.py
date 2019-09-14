@@ -99,7 +99,7 @@ class AutoregPiMlpModel(torch.nn.Module):
             hidden_sizes=hidden_sizes,
             output_size=2 * 2
         )
-        self.mlp_force = MlpModel(
+        self.mlp_delta = MlpModel(
             input_size=input_dim + 2 * n_tile,
             hidden_sizes=hidden_sizes,
             output_size=3 * 2,
@@ -124,7 +124,7 @@ class AutoregPiMlpModel(torch.nn.Module):
             assert len(actions) == 1
             action_loc = actions[0].view(T * B, -1)
             model_input = torch.cat((input_obs, action_loc.repeat((1, self._n_tile))), dim=-1)
-            output = self.mlp_force(model_input)
+            output = self.mlp_delta(model_input)
             mu, log_std = output[:, :3], output[:, 3:]
         else:
             raise Exception('Invalid self._counter', self._counter)
@@ -292,10 +292,10 @@ class GumbelAutoregPiMlpModel(torch.nn.Module):
                                                self._obs_ndim)
         input_obs = observation.view(T * B, -1)
         if self._counter == 0:
-            prob = F.softmax(self.mlp_loc(input_obs), -1)
-            prob = restore_leading_dims(prob, lead_dim, T, B)
+            logits = self.mlp_loc(input_obs)
+            logits = restore_leading_dims(logits, lead_dim, T, B)
             self._counter += 1
-            return DistInfo(prob=prob)
+            return logits
 
         elif self._counter == 1:
             assert len(actions) == 1
@@ -313,35 +313,41 @@ class GumbelAutoregPiMlpModel(torch.nn.Module):
         return self._counter < 2
 
     def sample_loglikelihood(self, dist_info):
-        if isinstance(dist_info, DistInfo):
-            cat_sample, log_likelihood = self.cat_distribution.sample_loglikelihood(dist_info)
-            one_hot = torch.zeros_like(dist_info.prob)
-            cat_sample = cat_sample.unsqueeze(-1)
-            one_hot.scatter_(1, cat_sample, 1)
-            action = (one_hot - dist_info.prob).detach() + dist_info.prob  # Make action differentiable through prob
-        elif isinstance(dist_info, DistInfoStd):
+        if isinstance(dist_info, DistInfoStd):
             action, log_likelihood = self.delta_distribution.sample_loglikelihood(dist_info)
         else:
-            raise Exception()
+            logits = dist_info
+
+            u = torch.rand_like(logits)
+            u = torch.clamp(u, 1e-5, 1 - 1e-5)
+            gumbel = -torch.log(-torch.log(u))
+            prob = F.softmax((logits + gumbel) / 10, dim=-1)
+
+            cat_sample = torch.argmax(prob, dim=-1)
+            log_likelihood = select_at_indexes(cat_sample, prob)
+
+            one_hot = to_onehot(cat_sample, 4, dtype=torch.float32)
+            action = (one_hot - prob).detach() + prob  # Make action differentiable through prob
 
         return action, log_likelihood
 
     def sample(self, dist_info):
-        if isinstance(dist_info, DistInfo):
-            if self.training:
-                cat_sample = self.cat_distribution.sample(dist_info)
-            else:
-                cat_sample = torch.max(dist_info.prob, dim=-1)[1].view(-1)
-            cat_sample = cat_sample.unsqueeze(-1)
-            one_hot = torch.zeros_like(dist_info.prob)
-            one_hot.scatter_(-1, cat_sample, 1)
-            action = one_hot
-        elif isinstance(dist_info, DistInfoStd):
+        if isinstance(dist_info, DistInfoStd):
             if self.training:
                 self.delta_distribution.set_std(None)
             else:
                 self.delta_distribution.set_std(0)
             action = self.delta_distribution.sample(dist_info)
+        else:
+            logits = dist_info
+            u = torch.rand_like(logits)
+            u = torch.clamp(u, 1e-5, 1 - 1e-5)
+            gumbel = -torch.log(-torch.log(u))
+            prob = F.softmax((logits + gumbel) / 10, dim=-1)
+
+            cat_sample = torch.argmax(prob, dim=-1)
+            action = to_onehot(cat_sample, 4, dtype=torch.float32)
+
         return action
 
 
