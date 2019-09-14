@@ -20,7 +20,7 @@ class Conv2dModel(torch.nn.Module):
             use_layernorm=True,
             ):
         super().__init__()
-        in_channels, h, w = image_shape
+        h, w, in_channels = image_shape
         if paddings is None:
             paddings = [0 for _ in range(len(channels))]
         assert len(channels) == len(kernel_sizes) == len(strides) == len(paddings)
@@ -35,12 +35,11 @@ class Conv2dModel(torch.nn.Module):
             kernel_size=k, stride=s, padding=p) for (ic, oc, k, s, p) in
             zip(in_channels, channels, kernel_sizes, strides, paddings)]
         sequence = list()
-        for conv_layer, maxp_stride, c in zip(conv_layers, maxp_strides, channels):
-            h, w = h // 2, w // 2
-
+        for conv_layer, maxp_stride, c, s in zip(conv_layers, maxp_strides, channels, strides):
+            h, w = h // s, w // s
             sequence.append(conv_layer)
             if use_layernorm:
-                sequence.append(nn.LayerNorm(h, w, c))
+                sequence.append(nn.LayerNorm((c, h, w)))
             sequence.append(nonlinearity())
             if maxp_stride > 1:
                 sequence.append(torch.nn.MaxPool2d(maxp_stride))  # No padding.
@@ -80,7 +79,7 @@ class Conv2dHeadModel(torch.nn.Module):
             ):
         super().__init__()
         self._extra_input_size = extra_input_size
-        c, h, w = image_shape
+        h, w, c = image_shape
         self.conv = Conv2dModel(
             image_shape=image_shape,
             channels=channels,

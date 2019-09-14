@@ -64,7 +64,7 @@ class PiConvModel(torch.nn.Module):
         pixel_obs = self.preprocessor(observation.pixels)
         lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
 
-        pixel_obs = pixel_obs.view(T * B, *self._image_shape)
+        pixel_obs = pixel_obs.view(T * B, *pixel_obs.shape[-3:])
         fields = _filter_name(observation._fields, 'pixels')
 
         if self._extra_input_size > 0:
@@ -341,7 +341,7 @@ class QofMuConvModel(torch.nn.Module):
         pixel_obs = self.preprocessor(observation.pixels)
         lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
 
-        pixel_obs = pixel_obs.view(T * B, *self._image_shape)
+        pixel_obs = pixel_obs.view(T * B, *pixel_obs.shape[-3:])
         fields = _filter_name(observation._fields, 'pixels')
         action = action.view(T * B, -1).repeat(1, self._n_tile)
         extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
