@@ -36,7 +36,10 @@ class SacAgent(BaseAgent):
             initial_model_state_dict=None,  # Pi model.
             action_squash=1,  # Max magnitude (or None).
             pretrain_std=0.75,  # High value to make near uniform sampling.
+            sampling_mode='normal'
             ):
+        assert sampling_mode in ['normal', 'max_q_eval', 'max_q_all']
+        self._training = True
         if isinstance(ModelCls, str):
             ModelCls = eval(ModelCls)
         if isinstance(QModelCls, str):
@@ -176,6 +179,7 @@ class SacAgent(BaseAgent):
         super().train_mode(itr)
         self.q1_model.train()
         self.q2_model.train()
+        self._training = True
 
     def sample_mode(self, itr):
         super().sample_mode(itr)
@@ -187,6 +191,7 @@ class SacAgent(BaseAgent):
             logger.log(f"Agent at itr {itr}, sample std: learned.")
         std = None if itr >= self.min_itr_learn else self.pretrain_std
         self.distribution.set_std(std)  # If None: std from policy dist_info.
+        self._training = False
 
     def eval_mode(self, itr):
         super().eval_mode(itr)

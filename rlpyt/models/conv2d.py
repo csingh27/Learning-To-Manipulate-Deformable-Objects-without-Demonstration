@@ -1,5 +1,6 @@
 
 import torch
+import torch.nn as nn
 
 from rlpyt.models.mlp import MlpModel
 from rlpyt.models.utils import conv2d_output_shape
@@ -9,15 +10,17 @@ class Conv2dModel(torch.nn.Module):
 
     def __init__(
             self,
-            in_channels,
+            image_shape,
             channels,
             kernel_sizes,
             strides,
             paddings=None,
             nonlinearity=torch.nn.ReLU,  # Module, not Functional.
             use_maxpool=False,  # if True: convs use stride 1, maxpool downsample.
+            use_layernorm=True,
             ):
         super().__init__()
+        in_channels, h, w = image_shape
         if paddings is None:
             paddings = [0 for _ in range(len(channels))]
         assert len(channels) == len(kernel_sizes) == len(strides) == len(paddings)
@@ -32,8 +35,13 @@ class Conv2dModel(torch.nn.Module):
             kernel_size=k, stride=s, padding=p) for (ic, oc, k, s, p) in
             zip(in_channels, channels, kernel_sizes, strides, paddings)]
         sequence = list()
-        for conv_layer, maxp_stride in zip(conv_layers, maxp_strides):
-            sequence.extend([conv_layer, nonlinearity()])
+        for conv_layer, maxp_stride, c in zip(conv_layers, maxp_strides, channels):
+            h, w = h // 2, w // 2
+
+            sequence.append(conv_layer)
+            if use_layernorm:
+                sequence.append(nn.LayerNorm(h, w, c))
+            sequence.append(nonlinearity())
             if maxp_stride > 1:
                 sequence.append(torch.nn.MaxPool2d(maxp_stride))  # No padding.
         self.conv = torch.nn.Sequential(*sequence)
@@ -74,7 +82,7 @@ class Conv2dHeadModel(torch.nn.Module):
         self._extra_input_size = extra_input_size
         c, h, w = image_shape
         self.conv = Conv2dModel(
-            in_channels=c,
+            image_shape=image_shape,
             channels=channels,
             kernel_sizes=kernel_sizes,
             strides=strides,
