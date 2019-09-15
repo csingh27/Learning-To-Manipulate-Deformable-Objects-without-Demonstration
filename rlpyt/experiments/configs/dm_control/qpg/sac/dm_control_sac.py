@@ -246,3 +246,45 @@ config = dict(
     ),
 )
 configs["sac_pixels_cloth_corner"] = config
+
+config = dict(
+    sac_module='sac_v2',
+    sac_agent_module='sac_agent_v2',
+    agent=dict(
+        ModelCls='PiMlpModel',
+        q_model_kwargs=dict(hidden_sizes=[256, 256]),
+        model_kwargs=dict(hidden_sizes=[256, 256]),
+    ),
+    algo=dict(
+        discount=0.99,
+        batch_size=256,
+        target_update_tau=0.005,
+        target_update_interval=1,
+        learning_rate=3e-4,
+        reparameterize=True,
+        policy_output_regularization=0.0,
+        reward_scale=1,
+        replay_ratio=64,
+    ),
+    model=dict(),
+    optim=dict(),
+    runner=dict(
+        n_steps=5e5,
+        log_interval_steps=1e4,
+    ),
+    sampler=dict(
+        batch_T=1,
+        batch_B=16,
+        max_decorrelation_steps=0,
+        eval_n_envs=10,
+        eval_max_steps=20000,
+        eval_max_trajectories=50,
+    ),
+    env=dict(
+        domain='rope_v2',
+        task='easy',
+        max_path_length=200,
+        task_kwargs=dict(random_location=True)
+    ),
+)
+configs["sac_state_rope_v2"] = config
