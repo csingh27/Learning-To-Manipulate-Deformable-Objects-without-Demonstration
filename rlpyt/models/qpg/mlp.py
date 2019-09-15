@@ -82,11 +82,15 @@ class AutoregPiMlpModel(torch.nn.Module):
             hidden_sizes,
             action_size,
             n_tile=50,
+            loc_size=2,
+            delta_size=2,
     ):
         super().__init__()
         self._obs_ndim = 1
         input_dim = int(np.sum(observation_shape))
         self._n_tile = n_tile
+        self._loc_size = loc_size
+        self._delta_size = delta_size
 
         # self._obs_ndim = len(observation_shape)
         # input_dim = int(np.prod(observation_shape))
@@ -97,12 +101,12 @@ class AutoregPiMlpModel(torch.nn.Module):
         self.mlp_loc = MlpModel(
             input_size=input_dim,
             hidden_sizes=hidden_sizes,
-            output_size=2 * 2
+            output_size=loc_size * 2
         )
         self.mlp_delta = MlpModel(
-            input_size=input_dim + 2 * n_tile,
+            input_size=input_dim + loc_size * n_tile,
             hidden_sizes=hidden_sizes,
-            output_size=3 * 2,
+            output_size=delta_size * 2,
         )
 
         self._counter = 0
@@ -119,13 +123,13 @@ class AutoregPiMlpModel(torch.nn.Module):
         input_obs = observation.view(T * B, -1)
         if self._counter == 0:
             output = self.mlp_loc(input_obs)
-            mu, log_std = output[:, :2], output[:, 2:]
+            mu, log_std = output.chunk(2, dim=-1)
         elif self._counter == 1:
             assert len(actions) == 1
             action_loc = actions[0].view(T * B, -1)
             model_input = torch.cat((input_obs, action_loc.repeat((1, self._n_tile))), dim=-1)
             output = self.mlp_delta(model_input)
-            mu, log_std = output[:, :3], output[:, 3:]
+            mu, log_std = output.chunk(2, dim=-1)
         else:
             raise Exception('Invalid self._counter', self._counter)
         mu, log_std = restore_leading_dims((mu, log_std), lead_dim, T, B)
