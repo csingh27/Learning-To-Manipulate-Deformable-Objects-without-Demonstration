@@ -28,7 +28,7 @@ sac_agent_module = ['sac_agent_v2', 'sac_agent_autoreg_v2', 'sac_agent_v2']
 values = list(zip(domain, task, model_cls, random_location, sac_module, sac_agent_module))
 dir_names = ["env_{}_{}_modelcls_{}_rnd_loc_{}".format(*v) for v in values]
 keys = [('env', 'domain'), ('env', 'task'), ('agent', 'ModelCls'), ('env', 'task_kwargs', 'random_location'),
-        ('sac_module,'), ('sac_agent_module',)]
+        ('sac_module',), ('sac_agent_module',)]
 variant_levels.append(VariantLevel(keys, values, dir_names))
 variants, log_dirs = make_variants(*variant_levels)
 

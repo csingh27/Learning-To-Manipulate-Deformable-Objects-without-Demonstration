@@ -82,7 +82,7 @@ class AutoregPiMlpModel(torch.nn.Module):
             hidden_sizes,
             action_size,
             n_tile=50,
-            loc_size=2,
+            loc_size=1,
             delta_size=2,
     ):
         super().__init__()
@@ -95,7 +95,7 @@ class AutoregPiMlpModel(torch.nn.Module):
         # self._obs_ndim = len(observation_shape)
         # input_dim = int(np.prod(observation_shape))
 
-        assert action_size == 5 # First 2 (location), then 3 (action)
+        assert action_size == loc_size + delta_size # First 2 (location), then 3 (action)
         self._action_size = action_size
 
         self.mlp_loc = MlpModel(
