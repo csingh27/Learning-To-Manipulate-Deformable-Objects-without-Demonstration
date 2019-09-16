@@ -67,3 +67,26 @@ def restore_leading_dims(tensors, lead_dim, T=1, B=1):
         assert B == 1
         tensors = tuple(t.squeeze(0) for t in tensors)
     return tensors if is_seq else tensors[0]
+
+
+def repeat(tensor, dims):
+    if len(dims) != len(tensor.shape):
+        raise ValueError("The length of the second argument must equal the number of dimensions of the first.")
+    for index, dim in enumerate(dims):
+        repetition_vector = [1]*(len(dims)+1)
+        repetition_vector[index+1] = dim
+        new_tensor_shape = list(tensor.shape)
+        new_tensor_shape[index] *= dim
+        tensor = tensor.unsqueeze(index+1).repeat(repetition_vector).reshape(new_tensor_shape)
+    return tensor
+
+
+def batched_index_select(input, dim, index):
+    for ii in range(1, len(input.shape)):
+        if ii != dim:
+            index = index.unsqueeze(ii)
+    expanse = list(input.shape)
+    expanse[0] = -1
+    expanse[dim] = -1
+    index = index.expand(expanse)
+    return torch.gather(input, dim, index)

@@ -2,6 +2,7 @@ from collections import namedtuple
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.nn.parallel import DistributedDataParallelCPU as DDPC
 
@@ -14,6 +15,7 @@ from rlpyt.utils.buffer import buffer_to
 from rlpyt.utils.logging import logger
 from rlpyt.models.utils import update_state_dict
 from rlpyt.utils.collections import namedarraytuple
+from rlpyt.utils.tensor import repeat, batched_index_select
 
 
 MIN_LOG_STD = -20
@@ -22,6 +24,7 @@ MAX_LOG_STD = 2
 AgentInfo = namedarraytuple("AgentInfo", ["dist_info"])
 Models = namedtuple("Models", ["pi", "q1", "q2"])
 
+MaxQInput = None
 
 class SacAgent(BaseAgent):
 
@@ -36,10 +39,9 @@ class SacAgent(BaseAgent):
             initial_model_state_dict=None,  # Pi model.
             action_squash=1,  # Max magnitude (or None).
             pretrain_std=0.75,  # High value to make near uniform sampling.
-            sampling_mode='normal'
+            max_q_eval_mode='none'
             ):
-        assert sampling_mode in ['normal', 'max_q_eval', 'max_q_all']
-        self._training = True
+        self._max_q_eval_mode = max_q_eval_mode
         if isinstance(ModelCls, str):
             ModelCls = eval(ModelCls)
         if isinstance(QModelCls, str):
@@ -146,12 +148,81 @@ class SacAgent(BaseAgent):
     def step(self, observation, prev_action, prev_reward):
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
-        mean, log_std = self.model(*model_inputs)
-        dist_info = DistInfoStd(mean=mean, log_std=log_std)
-        action = self.distribution.sample(dist_info)
-        agent_info = AgentInfo(dist_info=dist_info)
-        action, agent_info = buffer_to((action, agent_info), device="cpu")
-        return AgentStep(action=action, agent_info=agent_info)
+
+        if self._max_q_eval_mode == 'none':
+            mean, log_std = self.model(*model_inputs)
+            dist_info = DistInfoStd(mean=mean, log_std=log_std)
+            action = self.distribution.sample(dist_info)
+            agent_info = AgentInfo(dist_info=dist_info)
+            action, agent_info = buffer_to((action, agent_info), device="cpu")
+            return AgentStep(action=action, agent_info=agent_info)
+        else:
+            # TODO observations should be a tuple ordered position obs + pick location
+            global MaxQInput
+            observation, prev_action, prev_reward = model_inputs
+            if self._max_q_eval_mode == 'state_rope':
+                locations = np.arange(25).astype('float32') / 25.
+                locations = locations[:, None]
+                locations = np.tile(locations, (1, 50))
+            elif self._max_q_eval_mode == 'state_cloth_corner':
+                locations = np.array([[1, 0, 0, 0], [0, 1, 0, 0],
+                                     [0, 0, 1, 0], [0, 0, 0, 1]],
+                                     dtype='float32')
+                locations = np.tile(locations, (1, 50))
+            elif self._max_q_eval_mode == 'state_cloth_point':
+                locations = np.mgrid[0:9, 0:9].reshape(2, 81).T.astype('float32')
+                locations = (locations / 8. - 0.5) / 0.5
+            n_locations, bs = len(locations), observation[0].shape[0]
+            observation = [repeat(o, [n_locations] + [1] * (o.ndim - 1))
+                           for o in observation]
+            locations = locations.repeat(bs, 1)
+            locations = torch.from_numpy(locations).to(self.device)
+
+            fields = observation._fields
+            if MaxQInput is None:
+                MaxQInput = namedtuple('MaxQPolicyInput', fields + ('location',))
+            aug_observation = list(observation) + [locations]
+            aug_observation = MaxQInput(*aug_observation)
+
+            mean, log_std = self.model(aug_observation, prev_action, prev_reward)
+
+            q1 = self.q1(aug_observation, prev_action, prev_reward, mean)
+            q2 = self.q2(aug_observation, prev_action, prev_reward, mean)
+            q = torch.min(q1, q2)
+
+            q = q.view(bs, n_locations)
+            values, indices = torch.topk(q, 0.2 * int(n_locations), dim=-1)[1]
+
+            vmin, vmax = values.min(dim=-1, keepdim=True), values.max(dim=-1, keepdim=True)
+            values = (values - vmin) / (vmax - vmin)
+            values = F.log_softmax(values, -1)
+
+            uniform = torch.rand_like(values)
+            uniform = torch.clamp(uniform, 1e-5, 1 - 1e-5)
+            gumbel = -torch.log(-torch.log(uniform))
+
+            sampled_idx = torch.argmax(values + gumbel, dim=-1)
+            actual_idxs = torch.index_select(indices, 1, sampled_idx)
+            actual_idxs += (torch.arange(bs) * n_locations).to(self.device)
+
+            location = locations[actual_idxs]
+            delta = mean[actual_idxs]
+            action = torch.cat((location, delta), dim=-1)
+
+            mean, log_std = mean[actual_idxs], log_std[actual_idxs]
+            dist_info = DistInfoStd(mean=mean, log_std=log_std)
+
+            agent_info = AgentInfo(dist_info=dist_info)
+
+            action, agent_info = buffer_to((action, agent_info), device="cpu")
+            return AgentStep(action=action, agent_info=agent_info)
+
+
+
+
+
+
+
 
     def update_target(self, tau=1):
         update_state_dict(self.target_q1_model, self.q1_model.state_dict(), tau)
@@ -179,7 +250,6 @@ class SacAgent(BaseAgent):
         super().train_mode(itr)
         self.q1_model.train()
         self.q2_model.train()
-        self._training = True
 
     def sample_mode(self, itr):
         super().sample_mode(itr)
@@ -191,7 +261,6 @@ class SacAgent(BaseAgent):
             logger.log(f"Agent at itr {itr}, sample std: learned.")
         std = None if itr >= self.min_itr_learn else self.pretrain_std
         self.distribution.set_std(std)  # If None: std from policy dist_info.
-        self._training = False
 
     def eval_mode(self, itr):
         super().eval_mode(itr)
