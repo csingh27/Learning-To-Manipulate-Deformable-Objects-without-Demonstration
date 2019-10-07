@@ -82,8 +82,8 @@ class AutoregPiMlpModel(torch.nn.Module):
             hidden_sizes,
             action_size,
             n_tile=50,
-            loc_size=1,
-            delta_size=2,
+            loc_size=2,
+            delta_size=3,
     ):
         super().__init__()
         self._obs_ndim = 1

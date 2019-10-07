@@ -23,6 +23,7 @@ MAX_LOG_STD = 2
 
 AgentInfo = namedarraytuple("AgentInfo", ["dist_info"])
 Models = namedtuple("Models", ["pi", "q1", "q2"])
+i = 0
 
 MaxQInput = None
 
@@ -146,6 +147,7 @@ class SacAgent(BaseAgent):
 
     @torch.no_grad()
     def step(self, observation, prev_action, prev_reward):
+        threshold = 1.0
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
 
@@ -160,8 +162,15 @@ class SacAgent(BaseAgent):
             # TODO observations should be a tuple ordered position obs + pick location
             global MaxQInput
             observation, prev_action, prev_reward = model_inputs
+            fields = observation._fields
+            no_batch = len(observation.position.shape) == 1
+            if no_batch:
+                observation = [observation.position.unsqueeze(0)]
+            else:
+                observation = [observation.position]
+
             if self._max_q_eval_mode == 'state_rope':
-                locations = np.arange(25).astype('float32') / 25.
+                locations = np.arange(25).astype('float32')
                 locations = locations[:, None]
                 locations = np.tile(locations, (1, 50))
             elif self._max_q_eval_mode == 'state_cloth_corner':
@@ -171,29 +180,27 @@ class SacAgent(BaseAgent):
                 locations = np.tile(locations, (1, 50))
             elif self._max_q_eval_mode == 'state_cloth_point':
                 locations = np.mgrid[0:9, 0:9].reshape(2, 81).T.astype('float32')
-                locations = (locations / 8. - 0.5) / 0.5
-            n_locations, bs = len(locations), observation[0].shape[0]
-            observation = [repeat(o, [n_locations] + [1] * (o.ndim - 1))
+                locations = np.tile(locations, (1, 50))
+            n_locations = len(locations)
+            observation = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
                            for o in observation]
-            locations = locations.repeat(bs, 1)
             locations = torch.from_numpy(locations).to(self.device)
 
-            fields = observation._fields
             if MaxQInput is None:
-                MaxQInput = namedtuple('MaxQPolicyInput', fields + ('location',))
+                MaxQInput = namedtuple('MaxQPolicyInput', fields)
             aug_observation = list(observation) + [locations]
             aug_observation = MaxQInput(*aug_observation)
 
             mean, log_std = self.model(aug_observation, prev_action, prev_reward)
 
-            q1 = self.q1(aug_observation, prev_action, prev_reward, mean)
-            q2 = self.q2(aug_observation, prev_action, prev_reward, mean)
+            q1 = self.q1_model(aug_observation, prev_action, prev_reward, mean)
+            q2 = self.q2_model(aug_observation, prev_action, prev_reward, mean)
             q = torch.min(q1, q2)
+            print(q[:10])
 
-            q = q.view(bs, n_locations)
-            values, indices = torch.topk(q, 0.2 * int(n_locations), dim=-1)[1]
+            values, indices = torch.topk(q, int(threshold * n_locations), dim=-1)
 
-            vmin, vmax = values.min(dim=-1, keepdim=True), values.max(dim=-1, keepdim=True)
+            vmin, vmax = values.min(dim=-1, keepdim=True)[0], values.max(dim=-1, keepdim=True)[0]
             values = (values - vmin) / (vmax - vmin)
             values = F.log_softmax(values, -1)
 
@@ -201,13 +208,18 @@ class SacAgent(BaseAgent):
             uniform = torch.clamp(uniform, 1e-5, 1 - 1e-5)
             gumbel = -torch.log(-torch.log(uniform))
 
-            sampled_idx = torch.argmax(values + gumbel, dim=-1)
-            actual_idxs = torch.index_select(indices, 1, sampled_idx)
+            #sampled_idx = torch.argmax(values + gumbel, dim=-1)
+            sampled_idx = torch.randint(0, int(threshold * n_locations)).to(self.device)
+            actual_idxs = indices[torch.arange(bs), sampled_idx]
             actual_idxs += (torch.arange(bs) * n_locations).to(self.device)
 
-            location = locations[actual_idxs]
+            location = locations[actual_idxs][:, :2]
+            location = (location / 8. - 0.5) / 0.5
             delta = mean[actual_idxs]
             action = torch.cat((location, delta), dim=-1)
+
+            if no_batch:
+                action = action.squeeze(0)
 
             mean, log_std = mean[actual_idxs], log_std[actual_idxs]
             dist_info = DistInfoStd(mean=mean, log_std=log_std)

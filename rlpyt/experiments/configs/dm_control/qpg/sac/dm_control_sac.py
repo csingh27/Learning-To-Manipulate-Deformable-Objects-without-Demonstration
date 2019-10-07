@@ -155,6 +155,7 @@ configs["sac_pixels_ropev1"] = config
 config = dict(
     sac_module='sac_v2',
     sac_agent_module='sac_agent_v2',
+    name='',
     agent=dict(
         ModelCls='GumbelPiMlpModel',
         q_model_kwargs=dict(hidden_sizes=[256, 256]),
@@ -162,14 +163,14 @@ config = dict(
     ),
     algo=dict(
         discount=0.99,
-        batch_size=256,
+        batch_size=1024,
         target_update_tau=0.005,
         target_update_interval=1,
-        learning_rate=3e-4,
+        learning_rate=6e-4,
         reparameterize=True,
         policy_output_regularization=0.0,
         reward_scale=1,
-        replay_ratio=64,
+        replay_ratio=128,
     ),
     model=dict(),
     optim=dict(),
@@ -179,11 +180,11 @@ config = dict(
     ),
     sampler=dict(
         batch_T=1,
-        batch_B=16,
+        batch_B=32,
         max_decorrelation_steps=0,
         eval_n_envs=10,
         eval_max_steps=20000,
-        eval_max_trajectories=50,
+        eval_max_trajectories=10,
     ),
     env=dict(
         domain='cloth_corner',
@@ -200,6 +201,7 @@ config = dict(
     info_keys=None,
     sac_module='sac_v2',
     sac_agent_module='sac_agent_v2',
+    name='',
     agent=dict(
         ModelCls='GumbelPiConvModel',
         QModelCls='QofMuConvModel',
@@ -250,6 +252,7 @@ configs["sac_pixels_cloth_corner"] = config
 config = dict(
     sac_module='sac_v2',
     sac_agent_module='sac_agent_v2',
+    name='',
     agent=dict(
         ModelCls='PiMlpModel',
         q_model_kwargs=dict(hidden_sizes=[256, 256]),
@@ -257,14 +260,14 @@ config = dict(
     ),
     algo=dict(
         discount=0.99,
-        batch_size=256,
+        batch_size=1024,
         target_update_tau=0.005,
         target_update_interval=1,
-        learning_rate=3e-4,
+        learning_rate=6e-4,
         reparameterize=True,
         policy_output_regularization=0.0,
         reward_scale=1,
-        replay_ratio=64,
+        replay_ratio=128,
     ),
     model=dict(),
     optim=dict(),
@@ -274,7 +277,7 @@ config = dict(
     ),
     sampler=dict(
         batch_T=1,
-        batch_B=16,
+        batch_B=32,
         max_decorrelation_steps=0,
         eval_n_envs=10,
         eval_max_steps=20000,

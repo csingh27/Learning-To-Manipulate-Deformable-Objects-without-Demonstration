@@ -150,7 +150,7 @@ class DMControlEnv(Env):
         global Observation
         if Observation is None:
             Observation = namedarraytuple("Observation", list(observation.keys()))
-        observation = Observation(**{k: v for k, v in observation.items()
+        observation = Observation(**{k: v.copy() for k, v in observation.items()
                                      if k in self._observation_keys})
 
         return EnvStep(observation, reward, terminal, info)

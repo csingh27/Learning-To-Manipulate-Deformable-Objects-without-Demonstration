@@ -16,20 +16,20 @@ def cloth_corner_random(obs):
     return np.concatenate((one_hot, delta)).astype(np.float32)
 
 
-def rope_v1_random(obs):
-    pass
+def rope_v2_random(obs):
+    return np.random.rand(3) * 2 - 1
 
 
 def cloth_point_random(obs):
-    pass
+    return np.random.rand(4) * 2 - 1
 
 
 def simulate_policy():
-    policy = cloth_corner_random
-    env = DMControlEnv(domain='cloth_corner', task='easy',
+    policy = cloth_point_random
+    env = DMControlEnv(domain='cloth_point', task='easy',
                        max_path_length=120, task_kwargs=dict(random_location=False))
 
-    n_episodes = 10
+    n_episodes = 40
     returns = []
 
     for i in range(n_episodes):
@@ -43,6 +43,7 @@ def simulate_policy():
 
             if done or info.traj_done:
                 break
+        print(reward)
         returns.append(reward)
         print('Finished episode', i)
 
