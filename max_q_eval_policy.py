@@ -24,9 +24,10 @@ def main():
     params = torch.load(snapshot_file, map_location='cpu')
     with open(config_file, 'r') as f:
         config = json.load(f)
-    config['sampler']['batch_B'] = args.n_rollouts
-    config['sampler']['eval_n_envs'] = args.n_rollouts
+    config['sampler']['batch_B'] = 1
+    config['sampler']['eval_n_envs'] = 1
     config['sampler']['eval_max_trajectories'] = args.n_rollouts
+    config['env']['task_kwargs']['maxq'] = True
 
     itr, cum_steps = params['itr'], params['cum_steps']
     print(f'Loading experiment at itr {itr}, cum_steps {cum_steps}')
@@ -42,7 +43,6 @@ def main():
         EnvCls=DMControlEnv,
         env_kwargs=config["env"],
         eval_env_kwargs=config["env"],
-        max_q_eval=True,
         **config["sampler"]
     )
     sampler.initialize(agent)
