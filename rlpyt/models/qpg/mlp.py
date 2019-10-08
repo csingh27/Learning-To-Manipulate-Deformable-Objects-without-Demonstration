@@ -49,6 +49,7 @@ class PiMlpModel(torch.nn.Module):
             action_size,
             ):
         super().__init__()
+        action_size = 3
         self._obs_ndim = 1
         input_dim = int(np.sum(observation_shape))
 
@@ -368,6 +369,7 @@ class QofMuMlpModel(torch.nn.Module):
         super().__init__()
         self._obs_ndim = 1
         self._n_tile = n_tile
+        action_size = 3
         input_dim = int(np.sum(observation_shape))
 
         # self._obs_ndim = len(observation_shape)

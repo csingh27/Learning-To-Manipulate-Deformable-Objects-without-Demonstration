@@ -147,7 +147,7 @@ class SacAgent(BaseAgent):
 
     @torch.no_grad()
     def step(self, observation, prev_action, prev_reward):
-        threshold = 1.0
+        threshold = 0.05
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
 
@@ -165,10 +165,8 @@ class SacAgent(BaseAgent):
             no_batch = len(observation.position.shape) == 1
             if no_batch:
                 observation = [observation.position.unsqueeze(0)]
-                bs = 1
             else:
                 observation = [observation.position]
-                bs = observation.position.shape[0]
 
             if self._max_q_eval_mode == 'state_rope':
                 locations = np.arange(25).astype('float32')
@@ -181,7 +179,7 @@ class SacAgent(BaseAgent):
                 locations = np.tile(locations, (1, 50))
             elif self._max_q_eval_mode == 'state_cloth_point':
                 locations = np.mgrid[0:9, 0:9].reshape(2, 81).T.astype('float32')
-                locations = np.tile(locations, (1, 50))
+                locations = np.tile(locations, (1, 50)) / 8
             n_locations = len(locations)
             observation = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
                            for o in observation]
@@ -192,12 +190,13 @@ class SacAgent(BaseAgent):
             aug_observation = list(observation) + [locations]
             aug_observation = MaxQInput(*aug_observation)
 
+
             mean, log_std = self.model(aug_observation, prev_action, prev_reward)
 
             q1 = self.q1_model(aug_observation, prev_action, prev_reward, mean)
             q2 = self.q2_model(aug_observation, prev_action, prev_reward, mean)
             q = torch.min(q1, q2)
-            print(q[:10], q.shape)
+            #print(q[:10], q.shape)
 
             values, indices = torch.topk(q, int(threshold * n_locations), dim=-1)
 
@@ -210,14 +209,14 @@ class SacAgent(BaseAgent):
             # gumbel = -torch.log(-torch.log(uniform))
 
             #sampled_idx = torch.argmax(values + gumbel, dim=-1)
-            sampled_idx = torch.randint(0, int(threshold * n_locations)).to(self.device)
+            sampled_idx = torch.randint(high=int(threshold * n_locations), size=(1,)).to(self.device)
 
-            actual_idxs = indices[torch.arange(bs), sampled_idx]
-            actual_idxs += (torch.arange(bs) * n_locations).to(self.device)
+            actual_idxs = indices[sampled_idx]
+           # actual_idxs += (torch.arange(bs) * n_locations).to(self.device)
 
             location = locations[actual_idxs][:, :2]
-            location = (location / 8. - 0.5) / 0.5
-            delta = mean[actual_idxs]
+            location = (location - 0.5) / 0.5
+            delta = torch.tanh(mean[actual_idxs])
             action = torch.cat((location, delta), dim=-1)
 
             if no_batch:
@@ -230,13 +229,6 @@ class SacAgent(BaseAgent):
 
             action, agent_info = buffer_to((action, agent_info), device="cpu")
             return AgentStep(action=action, agent_info=agent_info)
-
-
-
-
-
-
-
 
     def update_target(self, tau=1):
         update_state_dict(self.target_q1_model, self.q1_model.state_dict(), tau)
