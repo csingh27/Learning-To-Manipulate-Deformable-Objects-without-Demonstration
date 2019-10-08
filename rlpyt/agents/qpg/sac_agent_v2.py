@@ -147,7 +147,7 @@ class SacAgent(BaseAgent):
 
     @torch.no_grad()
     def step(self, observation, prev_action, prev_reward):
-        threshold = 0.05
+        threshold = 1.0
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
 
@@ -164,9 +164,15 @@ class SacAgent(BaseAgent):
             fields = observation._fields
             no_batch = len(observation.position.shape) == 1
             if no_batch:
-                observation = [observation.position.unsqueeze(0)]
+                if 'state' in self._max_q_eval_mode:
+                    observation = [observation.position.unsqueeze(0)]
+                else:
+                    observation = [observation.pixels.unsqueeze(0)]
             else:
-                observation = [observation.position]
+                if 'state' in self._max_q_eval_mode:
+                    observation = [observation.position]
+                else:
+                    observation = [observation.pixels]
 
             if self._max_q_eval_mode == 'state_rope':
                 locations = np.arange(25).astype('float32')
@@ -180,6 +186,11 @@ class SacAgent(BaseAgent):
             elif self._max_q_eval_mode == 'state_cloth_point':
                 locations = np.mgrid[0:9, 0:9].reshape(2, 81).T.astype('float32')
                 locations = np.tile(locations, (1, 50)) / 8
+            elif self._max_q_eval_mode == 'pixels_cloth_point':
+                image = observation.pixels.squeeze(0)
+                locations = np.transpose(np.where(np.any(image < 100, axis=-1))) / 63.
+                print(locations.shape)
+
             n_locations = len(locations)
             observation = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
                            for o in observation]

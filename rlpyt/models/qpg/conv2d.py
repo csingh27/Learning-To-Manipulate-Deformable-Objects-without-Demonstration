@@ -42,6 +42,7 @@ class PiConvModel(torch.nn.Module):
         if paddings is None:
             # SAME padding for odd kernel sizes
             paddings = [ks // 2 for ks in kernel_sizes]
+        action_size = 3
 
         self._obs_ndim = 3
         self._action_size = action_size
@@ -320,6 +321,7 @@ class QofMuConvModel(torch.nn.Module):
         assert all([ks % 2 == 1 for ks in kernel_sizes])
         if paddings is None:
             paddings = [ks // 2 for ks in kernel_sizes]
+        action_size = 3
 
         self._obs_ndim = 3
         self._action_size = action_size
