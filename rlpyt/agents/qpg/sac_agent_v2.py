@@ -147,7 +147,7 @@ class SacAgent(BaseAgent):
 
     @torch.no_grad()
     def step(self, observation, prev_action, prev_reward):
-        threshold = 1.0
+        threshold = 0.2
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
 
@@ -162,7 +162,10 @@ class SacAgent(BaseAgent):
             global MaxQInput
             observation, prev_action, prev_reward = model_inputs
             fields = observation._fields
-            no_batch = len(observation.position.shape) == 1
+            if 'position' in fields:
+                no_batch = len(observation.position.shape) == 1
+            else:
+                no_batch = len(observation.pixels.shape) == 3
             if no_batch:
                 if 'state' in self._max_q_eval_mode:
                     observation = [observation.position.unsqueeze(0)]
@@ -187,9 +190,10 @@ class SacAgent(BaseAgent):
                 locations = np.mgrid[0:9, 0:9].reshape(2, 81).T.astype('float32')
                 locations = np.tile(locations, (1, 50)) / 8
             elif self._max_q_eval_mode == 'pixels_cloth_point':
-                image = observation.pixels.squeeze(0)
-                locations = np.transpose(np.where(np.any(image < 100, axis=-1))) / 63.
-                print(locations.shape)
+                image = observation[0].squeeze(0).cpu().numpy().astype('uint8')
+                segmentation = image < 100
+                locations = np.transpose(np.where(np.any(segmentation, axis=-1))).astype('float32')
+                locations = np.tile(locations, (1, 50)) / 63.
 
             n_locations = len(locations)
             observation = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
@@ -198,9 +202,8 @@ class SacAgent(BaseAgent):
 
             if MaxQInput is None:
                 MaxQInput = namedtuple('MaxQPolicyInput', fields)
-            aug_observation = list(observation) + [locations]
+            aug_observation = [locations] + list(observation)
             aug_observation = MaxQInput(*aug_observation)
-
 
             mean, log_std = self.model(aug_observation, prev_action, prev_reward)
 
