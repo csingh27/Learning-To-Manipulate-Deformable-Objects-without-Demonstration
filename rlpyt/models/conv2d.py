@@ -102,16 +102,21 @@ class Conv2dHeadModel(torch.nn.Module):
             self.head = lambda x: x
             self._output_size = conv_out_size
 
-    def forward(self, input, extra_input=None):
-        embedding = self.conv(input).view(input.shape[0], -1)
+    def forward_embedding(self, input):
+        return self.conv(input).view(input.shape[0], -1)
 
+    def forward_output(self, input, extra_input=None):
         if self._extra_input_size > 0:
             assert extra_input.shape[1] == self._extra_input_size
             extra_input = extra_input.view(extra_input.shape[0], -1)
-            mlp_input = torch.cat((embedding, extra_input), dim=-1)
+            mlp_input = torch.cat((input, extra_input), dim=-1)
         else:
-            mlp_input = embedding
+            mlp_input = input
         return self.head(mlp_input)
+
+    def forward(self, input, extra_input=None):
+        embedding = self.forward_embedding(input)
+        return self.forward_output(embedding, extra_input=extra_input)
 
     @property
     def output_size(self):

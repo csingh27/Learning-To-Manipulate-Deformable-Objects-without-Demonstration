@@ -33,6 +33,12 @@ class MuMlpModel(torch.nn.Module):
             output_size=action_size,
         )
 
+    def forward_embedding(self, observation):
+        return observation
+
+    def forward_output(self, observation):
+        return self(observation, None, None)
+
     def forward(self, observation, prev_action, prev_reward):
         lead_dim, T, B, _ = infer_leading_dims(observation, self._obs_ndim)
         mu = self._output_max * torch.tanh(self.mlp(observation.view(T * B, -1)))
@@ -62,6 +68,12 @@ class PiMlpModel(torch.nn.Module):
             hidden_sizes=hidden_sizes,
             output_size=action_size * 2,
         )
+
+    def forward_embedding(self, observation):
+        return observation
+
+    def forward_output(self, observation):
+        return self(observation, None, None)
 
     def forward(self, observation, prev_action, prev_reward):
         if isinstance(observation, tuple):
@@ -381,6 +393,12 @@ class QofMuMlpModel(torch.nn.Module):
             hidden_sizes=hidden_sizes,
             output_size=1,
         )
+
+    def forward_embedding(self, observation):
+        return observation
+
+    def forward_output(self, observation, action):
+        return self(observation, None, None, action)
 
     def forward(self, observation, prev_action, prev_reward, action):
         if isinstance(observation, tuple):

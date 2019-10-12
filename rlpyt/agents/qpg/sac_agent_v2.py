@@ -196,21 +196,33 @@ class SacAgent(BaseAgent):
                 locations = np.transpose(np.where(np.any(segmentation, axis=-1))).astype('float32')
                 locations = np.tile(locations, (1, 50)) / 63.
 
+            observation_pi = self.model.forward_embedding(observation)
+            observation_q1 = self.q1_model.forward_embedding(observation)
+            observation_q2 = self.q2_model.forward_embedding(observation)
+
             n_locations = len(locations)
-            observation = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
-                           for o in observation]
+            observation_pi = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
+                              for o in observation_pi]
+            observation_q1 = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
+                              for o in observation_q1]
+            observation_q2 = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
+                              for o in observation_q2]
             locations = np.tile(locations, (batch_size, 1))
             locations = torch.from_numpy(locations).to(self.device)
 
             if MaxQInput is None:
                 MaxQInput = namedtuple('MaxQPolicyInput', fields)
-            aug_observation = [locations] + list(observation)
-            aug_observation = MaxQInput(*aug_observation)
+            aug_observation_pi = [locations] + list(observation_pi)
+            aug_observation_pi = MaxQInput(*aug_observation_pi)
+            aug_observation_q1 = [locations] + list(observation_q1)
+            aug_observation_q1 = MaxQInput(*aug_observation_q1)
+            aug_observation_q2 = [locations] + list(observation_q2)
+            aug_observation_q2 = MaxQInput(*aug_observation_q2)
 
-            mean, log_std = self.model(aug_observation, prev_action, prev_reward)
+            mean, log_std = self.model.forward_output(aug_observation_pi)#, prev_action, prev_reward)
 
-            q1 = self.q1_model(aug_observation, prev_action, prev_reward, mean)
-            q2 = self.q2_model(aug_observation, prev_action, prev_reward, mean)
+            q1 = self.q1_model.forward_output(aug_observation_q1, mean)
+            q2 = self.q2_model.forward_output(aug_observation_q2, mean)
             q = torch.min(q1, q2)
             q = q.view(batch_size, n_locations)
 

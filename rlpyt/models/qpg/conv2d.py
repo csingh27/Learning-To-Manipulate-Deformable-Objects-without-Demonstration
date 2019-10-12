@@ -61,6 +61,30 @@ class PiConvModel(torch.nn.Module):
                                     nonlinearity=nonlinearity, use_maxpool=False,
                                     extra_input_size=extra_input_size)
 
+    def forward_embedding(self, observation):
+        pixel_obs = observation[0]
+        lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
+        pixel_obs = pixel_obs.view(T * B, *self._image_shape)
+        pixel_obs = self.preprocessor(pixel_obs)
+
+        out = self.conv.forward_embedding(pixel_obs)
+        out = restore_leading_dims(out, lead_dim, T, B)
+        return [out]
+
+    def forward_output(self, observation, extra_input=None):
+        lead_dim, T, B, _ = infer_leading_dims(observation.pixels, 1)
+        fields = _filter_name(observation._fields, 'pixels')
+        if self._extra_input_size > 0:
+            extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
+                                     for f in fields], dim=-1)
+        else:
+            extra_input = None
+        output = self.conv.forward_output(observation.pixels, extra_input=extra_input)
+
+        mu, log_std = output[:, :self._action_size], output[:, self._action_size:]
+        mu, log_std = restore_leading_dims((mu, log_std), lead_dim, T, B)
+        return mu, log_std
+
     def forward(self, observation, prev_action, prev_reward):
         pixel_obs = observation.pixels
         lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
@@ -338,6 +362,29 @@ class QofMuConvModel(torch.nn.Module):
                                     paddings=paddings,
                                     nonlinearity=nonlinearity, use_maxpool=False,
                                     extra_input_size=extra_input_size + action_size * n_tile)
+
+    def forward_embedding(self, observation):
+        pixel_obs = observation[0]
+        lead_dim, T, B, _ = infer_leading_dims(pixel_obs, self._obs_ndim)
+        pixel_obs = pixel_obs.view(T * B, *self._image_shape)
+        pixel_obs = self.preprocessor(pixel_obs)
+
+        out = self.conv.forward_embedding(pixel_obs)
+        out = restore_leading_dims(out, lead_dim, T, B)
+        return [out]
+
+
+    def forward_output(self, observation, action):
+        pixel_obs = observation.pixels
+        lead_dim, T, B, _ = infer_leading_dims(pixel_obs, 1)
+        fields = _filter_name(observation._fields, 'pixels')
+        action = action.view(T * B, -1).repeat(1, self._n_tile)
+        extra_input = torch.cat([getattr(observation, f).view(T * B, -1)
+                                 for f in fields] + [action], dim=-1)
+        q = self.conv.forward_output(pixel_obs, extra_input=extra_input).squeeze(-1)
+        q = restore_leading_dims(q, lead_dim, T, B)
+
+        return q
 
     def forward(self, observation, prev_action, prev_reward, action):
         pixel_obs = observation.pixels
