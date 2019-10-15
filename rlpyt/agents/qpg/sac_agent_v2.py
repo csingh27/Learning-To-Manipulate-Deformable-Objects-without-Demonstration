@@ -326,10 +326,6 @@ class SacAgent(BaseAgent):
 
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict["model"])
-        self.q1_model.load_state_dict(state_dict["q1_model"])
-        self.q2_model.load_state_dict(state_dict["q2_model"])
-        self.target_q1_model.load_state_dict(state_dict['target_q1_model'])
-        self.target_q2_model.load_state_dict(state_dict['target_q2_model'])
         self.log_alpha.data = state_dict['alpha']
 
         [q.load_state_dict(state_dict[f'q{i}_model'])

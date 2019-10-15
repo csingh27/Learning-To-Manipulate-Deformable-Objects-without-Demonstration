@@ -16,10 +16,7 @@ from rlpyt.utils.tensor import valid_mean
 from rlpyt.algos.utils import valid_from_done
 
 
-OptInfo = namedtuple("OptInfo",
-    ["q1Loss", "q2Loss", "piLoss", "alphaLoss",
-    "q1GradNorm", "q2GradNorm", "piGradNorm",
-    "q1", "q2", "piMu", "piLogStd", "alpha", "qMeanDiff"])
+OptInfo = None
 SamplesToBuffer = namedarraytuple("SamplesToRepay",
     ["observation", "action", "reward", "done"])
 
@@ -56,6 +53,15 @@ class SAC(RlAlgorithm):
         self._batch_size = batch_size
         del batch_size  # Property.
         save__init__args(locals())
+
+        keys = ["piLoss", "alphaLoss",
+                "piMu", "piLogStd", "alpha", "qMeanDiff",
+                "piMu", "piGradNorm"])
+        keys += [f'q{i}GradNorm' for i in range(self.agent.n_qs)]
+        keys += [f'q{i}' for i in range(self.agent.n_qs)]
+        keys += [f'q{i}Loss' for i in range(self.agent.n_qs)]
+        global OptInfo
+        OptInfo = namedtuple('OptInfo', keys)
 
     def initialize(self, agent, n_itr, batch_spec, mid_batch_reset, examples,
             world_size=1, rank=0):
@@ -96,10 +102,8 @@ class SAC(RlAlgorithm):
         self.rank = rank
         self.pi_optimizer = self.OptimCls(self.agent.pi_parameters(),
             lr=self.learning_rate, **self.optim_kwargs)
-        self.q1_optimizer = self.OptimCls(self.agent.q1_parameters(),
-            lr=self.learning_rate, **self.optim_kwargs)
-        self.q2_optimizer = self.OptimCls(self.agent.q2_parameters(),
-            lr=self.learning_rate, **self.optim_kwargs)
+        self.q_optimizers = [self.OptimCls(q_param)
+                             for q_param in self.agent_q_parameters()]
         self.alpha_optimizer = self.OptimCls([self.agent.log_alpha],
             lr=self.learning_rate, **self.optim_kwargs)
         if self.initial_optim_state_dict is not None:
@@ -134,8 +138,8 @@ class SAC(RlAlgorithm):
             return opt_info
         for _ in range(self.updates_per_optimize):
             samples_from_replay = self.replay_buffer.sample_batch(self.batch_size)
-            losses, values = self.loss(samples_from_replay)
-            q1_loss, q2_loss, pi_loss, alpha_loss = losses
+            q_losses, losses, values, q_values = self.loss(samples_from_replay)
+            pi_loss, alpha_loss = losses
 
             self.pi_optimizer.zero_grad()
             pi_loss.backward()
@@ -147,21 +151,18 @@ class SAC(RlAlgorithm):
             alpha_loss.backward()
             self.alpha_optimizer.step()
 
-            self.q1_optimizer.zero_grad()
-            q1_loss.backward()
-            q1_grad_norm = torch.nn.utils.clip_grad_norm_(self.agent.q1_parameters(),
-                self.clip_grad_norm)
-            self.q1_optimizer.step()
+            q_grad_norms = []
+            for q_opt, q_loss, q_param in zip(self.q_optimizers, q_losses,
+                                               self.agent.q_parameters):
+                q_opt.zero_grad()
+                q_loss.backward()
+                q_grad_norm = torch.nn.utils.clip_grad_norm_(q_param,
+                                                             self.clip_grad_norm)
+                q_opt.step()
+                q_grad_norms.append(q_grad_norm)
 
-            self.q2_optimizer.zero_grad()
-            q2_loss.backward()
-            q2_grad_norm = torch.nn.utils.clip_grad_norm_(self.agent.q2_parameters(),
-                self.clip_grad_norm)
-            self.q2_optimizer.step()
-
-            grad_norms = (q1_grad_norm, q2_grad_norm, pi_grad_norm)
-
-            self.append_opt_info_(opt_info, losses, grad_norms, values)
+            self.append_opt_info_(opt_info, q_losses, losses,
+                                  q_grad_norms, pi_grad_norm, q_values, values)
             self.update_counter += 1
             if self.update_counter % self.target_update_interval == 0:
                 self.agent.update_target(self.target_update_tau)
@@ -179,7 +180,7 @@ class SAC(RlAlgorithm):
         """Samples have leading batch dimension [B,..] (but not time)."""
         agent_inputs, target_inputs, action = buffer_to(
             (samples.agent_inputs, samples.target_inputs, samples.action))
-        q1, q2 = self.agent.q(*agent_inputs, action)
+        qs = self.agent.q(*agent_inputs, action)
         with torch.no_grad():
             target_v = self.agent.target_v(*target_inputs).detach()
         disc = self.discount ** self.n_step_return
@@ -190,8 +191,7 @@ class SAC(RlAlgorithm):
         else:
             valid = valid_from_done(samples.done)
 
-        q1_loss = 0.5 * valid_mean((y - q1) ** 2, valid)
-        q2_loss = 0.5 * valid_mean((y - q2) ** 2, valid)
+        q_losses = [0.5 * valid_mean((y - q) ** 2, valid) for q in qs]
 
         new_action, log_pi, (pi_mean, pi_log_std) = self.agent.pi(*agent_inputs)
         if not self.reparameterize:
@@ -213,9 +213,10 @@ class SAC(RlAlgorithm):
         # Calculate log_alpha loss
         alpha_loss = -valid_mean(self.agent.log_alpha * (log_pi + self.target_entropy).detach())
 
-        losses = (q1_loss, q2_loss, pi_loss, alpha_loss)
-        values = tuple(val.detach() for val in (q1, q2, pi_mean, pi_log_std, alpha))
-        return losses, values
+        losses = (pi_loss, alpha_loss)
+        values = tuple(val.detach() for val in (pi_mean, pi_log_std, alpha))
+        q_values = tuple(q.detach() for q in qs)
+        return q_losses, losses, values, q_values
 
 
     def get_action_prior(self, action):
@@ -226,35 +227,35 @@ class SAC(RlAlgorithm):
                 action, GaussianDistInfo(mean=torch.zeros_like(action)))
         return prior_log_pi
 
-    def append_opt_info_(self, opt_info, losses, grad_norms, values):
+    def append_opt_info_(self, opt_info, q_losses, losses, q_grad_norms,
+                         pi_grad_norm, q_values, ,values):
         """In-place."""
-        q1_loss, q2_loss, pi_loss, alpha_loss = losses
-        q1_grad_norm, q2_grad_norm, pi_grad_norm = grad_norms
-        q1, q2, pi_mean, pi_log_std, alpha = values
-        opt_info.q1Loss.append(q1_loss.item())
-        opt_info.q2Loss.append(q2_loss.item())
+        pi_loss, alpha_loss = losses
+        pi_mean, pi_log_std, alpha = values
+
+        for i in range(self.agent.n_qs):
+            getattr(opt_info, f'q{i}Loss').append(q_losses[i].item())
+            getattr(opt_info, f'q{i}').extend(q_values[i][::10].numpy())
+            getattr(opt_info, f'q{i}GradNorm').append(q_grad_norms[i])
+
         opt_info.piLoss.append(pi_loss.item())
         opt_info.alphaLoss.append(alpha_loss.item())
-        opt_info.q1GradNorm.append(q1_grad_norm)
-        opt_info.q2GradNorm.append(q2_grad_norm)
         opt_info.piGradNorm.append(pi_grad_norm)
-        opt_info.q1.extend(q1[::10].numpy())  # Downsample for stats.
-        opt_info.q2.extend(q2[::10].numpy())
         opt_info.piMu.extend(pi_mean[::10].numpy())
         opt_info.piLogStd.extend(pi_log_std[::10].numpy())
         opt_info.alpha.append(alpha.numpy())
-        opt_info.qMeanDiff.append(torch.mean(abs(q1 - q2)).item())
 
     def optim_state_dict(self):
-        return dict(
+        rtn = dict(
             pi_optimizer=self.pi_optimizer.state_dict(),
-            q1_optimizer=self.q1_optimizer.state_dict(),
-            q2_optimizer=self.q2_optimizer.state_dict(),
             alpha_optimizer=self.alpha_optimizer.state_dict(),
         )
+        rtn.update({f'q{i}_optimizer': q_opt.state_dict()
+                    for i, q_opt in enumerate(self.q_optimizers)})
+        return rtn
 
     def load_optim_state_dict(self, state_dict):
         self.pi_optimizer.load_state_dict(state_dict["pi_optimizer"])
-        self.q1_optimizer.load_state_dict(state_dict["q1_optimizer"])
-        self.q2_optimizer.load_state_dict(state_dict["q2_optimizer"])
         self.alpha_optimizer.load_state_dict(state_dict["alpha_optimizer"])
+        [q_opt.load_state_dict(state_dict[f'q{i}_optimizer'])
+         for i, q_opt in enumerate(self.q_optimizers)]
