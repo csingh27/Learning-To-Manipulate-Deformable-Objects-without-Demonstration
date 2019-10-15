@@ -211,6 +211,7 @@ config = dict(
         model_kwargs=dict(channels=(64, 64, 4),
                           kernel_sizes=(3, 3, 3), strides=(2, 2, 2),
                           hidden_sizes=[256, 256]),
+        n_qs=2,
     ),
     algo=dict(
         discount=0.99,

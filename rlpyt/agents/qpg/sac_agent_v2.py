@@ -22,7 +22,7 @@ MIN_LOG_STD = -20
 MAX_LOG_STD = 2
 
 AgentInfo = namedarraytuple("AgentInfo", ["dist_info"])
-Models = namedtuple("Models", ["pi", "q1", "q2"])
+Models = None
 i = 0
 
 MaxQInput = None
@@ -40,7 +40,8 @@ class SacAgent(BaseAgent):
             initial_model_state_dict=None,  # Pi model.
             action_squash=1,  # Max magnitude (or None).
             pretrain_std=0.75,  # High value to make near uniform sampling.
-            max_q_eval_mode='pixels'
+            max_q_eval_mode='none',
+            n_qs=2,
             ):
         self._max_q_eval_mode = max_q_eval_mode
         if isinstance(ModelCls, str):
@@ -58,6 +59,10 @@ class SacAgent(BaseAgent):
         self.min_itr_learn = 0  # Get from algo.
 
         self.log_alpha = None
+        print('n_qs', self.n_qs)
+
+        global Models
+        Models = namedtuple("Models", ["pi"] + [f"q{i}" for i in range(self.n_qs)])
 
     def initialize(self, env_spaces, share_memory=False,
             global_B=1, env_ranks=None):
@@ -66,13 +71,13 @@ class SacAgent(BaseAgent):
         super().initialize(env_spaces, share_memory,
             global_B=global_B, env_ranks=env_ranks)
         self.initial_model_state_dict = _initial_model_state_dict
-        self.q1_model = self.QModelCls(**self.env_model_kwargs, **self.q_model_kwargs)
-        self.q2_model = self.QModelCls(**self.env_model_kwargs, **self.q_model_kwargs)
+        self.q_models = [self.QModelCls(**self.env_model_kwargs, **self.q_model_kwargs)
+                         for _ in range(self.n_qs)]
 
-        self.target_q1_model = self.QModelCls(**self.env_model_kwargs, **self.q_model_kwargs)
-        self.target_q2_model = self.QModelCls(**self.env_model_kwargs, **self.q_model_kwargs)
-        self.target_q1_model.load_state_dict(self.q1_model.state_dict())
-        self.target_q2_model.load_state_dict(self.q2_model.state_dict())
+        self.target_q_models = [self.QModelCls(**self.env_model_kwargs, **self.q_model_kwargs)
+                                for _ in range(self.n_qs)]
+        [target_q.load_state_dict(q.state_dict())
+         for target_q, q in zip(self.target_q_models, self.q_models)]
 
         self.log_alpha = nn.Parameter(torch.tensor(0.0, dtype=torch.float32))
 
@@ -88,17 +93,14 @@ class SacAgent(BaseAgent):
 
     def to_device(self, cuda_idx=None):
         super().to_device(cuda_idx)
-        self.q1_model.to(self.device)
-        self.q2_model.to(self.device)
-        self.target_q1_model.to(self.device)
-        self.target_q2_model.to(self.device)
+        [q.to(self.device) for q in self.q_models]
+        [q_target.to(self.device) for q_target in self.target_q_models]
         self.log_alpha.to(self.device)
 
     def data_parallel(self):
         super().data_parallel()
         DDP_WRAP = DDPC if self.device.type == "cpu" else DDP
-        self.q1_model = DDP_WRAP(self.q1_model)
-        self.q2_model = DDP_WRAP(self.q2_model)
+        self.q_models = [DDP_WRAP(q) for q in self.q_models]
 
     def give_min_itr_learn(self, min_itr_learn):
         self.min_itr_learn = min_itr_learn  # From algo.
@@ -113,16 +115,14 @@ class SacAgent(BaseAgent):
     def q(self, observation, prev_action, prev_reward, action):
         model_inputs = buffer_to((observation, prev_action, prev_reward,
             action), device=self.device)
-        q1 = self.q1_model(*model_inputs)
-        q2 = self.q2_model(*model_inputs)
-        return q1.cpu(), q2.cpu()
+        qs = [q(*model_inputs) for q in self.q_models]
+        return [q.cpu() for q in qs]
 
     def target_q(self, observation, prev_action, prev_reward, action):
         model_inputs = buffer_to((observation, prev_action, prev_reward,
             action), device=self.device)
-        q1 = self.target_q1_model(*model_inputs)
-        q2 = self.target_q2_model(*model_inputs)
-        return q1.cpu(), q2.cpu()
+        qs = [target_q(*model_inputs) for target_q in self.target_q_models]
+        return [q.cpu() for q in qs]
 
     def pi(self, observation, prev_action, prev_reward):
         model_inputs = buffer_to((observation, prev_action, prev_reward),
@@ -139,8 +139,8 @@ class SacAgent(BaseAgent):
 
         next_actions, next_log_pis, _ = self.pi(*model_inputs)
 
-        q1, q2 = self.target_q(observation, prev_action, prev_reward, next_actions)
-        min_next_q = torch.min(q1, q2)
+        qs = self.target_q(observation, prev_action, prev_reward, next_actions)
+        min_next_q = torch.min(qs, dim=0)
 
         target_v = min_next_q - self.log_alpha.exp().detach().cpu() * next_log_pis
         return target_v.cpu()
@@ -271,12 +271,13 @@ class SacAgent(BaseAgent):
             return AgentStep(action=action, agent_info=agent_info)
 
     def update_target(self, tau=1):
-        update_state_dict(self.target_q1_model, self.q1_model.state_dict(), tau)
-        update_state_dict(self.target_q2_model, self.q2_model.state_dict(), tau)
+        [update_state_dict(target_q, q.state_dict(), tau)
+         for target_q, q in zip(self.target_q_models, self.q_models)]
 
     @property
     def models(self):
-        return Models(pi=self.model, q1=self.q1_model, q2=self.q2_model)
+        return Models(pi=self.model,
+                      **{f'p{i}': q for i, q in enumerate(self.q_models)})
 
     def parameters(self):
         for model in self.models:
@@ -294,13 +295,11 @@ class SacAgent(BaseAgent):
 
     def train_mode(self, itr):
         super().train_mode(itr)
-        self.q1_model.train()
-        self.q2_model.train()
+        [q.train() for q in self.q_models]
 
     def sample_mode(self, itr):
         super().sample_mode(itr)
-        self.q1_model.eval()
-        self.q2_model.eval()
+        [q.eval() for q in self.q_models]
         if itr == 0:
             logger.log(f"Agent at itr {itr}, sample std: {self.pretrain_std}")
         if itr == self.min_itr_learn:
@@ -310,19 +309,20 @@ class SacAgent(BaseAgent):
 
     def eval_mode(self, itr):
         super().eval_mode(itr)
-        self.q1_model.eval()
-        self.q2_model.eval()
+        [q.eval() for q in self.q_models]
         self.distribution.set_std(0.)  # Deterministic (dist_info std ignored).
 
     def state_dict(self):
-        return dict(
+        rtn = dict(
             model=self.model.state_dict(),  # Pi model.
-            q1_model=self.q1_model.state_dict(),
-            q2_model=self.q2_model.state_dict(),
-            target_q1_model=self.target_q1_model.state_dict(),
-            target_q2_model=self.target_q2_model.state_dict(),
             alpha=self.log_alpha.data
         )
+        rtn.update({f'q{i}_model': q.state_dict()
+                    for q in self.q_models})
+        rtn.update({f'target_q{i}_model': q.state_dict()
+                    for q in self.target_q_models})
+        return rtn
+
 
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict["model"])
@@ -331,3 +331,8 @@ class SacAgent(BaseAgent):
         self.target_q1_model.load_state_dict(state_dict['target_q1_model'])
         self.target_q2_model.load_state_dict(state_dict['target_q2_model'])
         self.log_alpha.data = state_dict['alpha']
+
+        [q.load_state_dict(state_dict[f'q{i}_model'])
+         for i, q in enumerate(self.q_models)]
+        [q.load_state_dict(state_dict[f'target_q{i}_model'])
+         for i, q in enumerate(self.target_q_models)]
