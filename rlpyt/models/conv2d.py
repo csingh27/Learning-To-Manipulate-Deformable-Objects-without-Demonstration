@@ -107,7 +107,7 @@ class Conv2dHeadModel(torch.nn.Module):
 
     def forward_output(self, input, extra_input=None):
         if self._extra_input_size > 0:
-            assert extra_input.shape[1] == self._extra_input_size
+            assert extra_input.shape[1] == self._extra_input_size, (extra_input.shape, self._extra_input_size, input.shape)
             extra_input = extra_input.view(extra_input.shape[0], -1)
             mlp_input = torch.cat((input, extra_input), dim=-1)
         else:

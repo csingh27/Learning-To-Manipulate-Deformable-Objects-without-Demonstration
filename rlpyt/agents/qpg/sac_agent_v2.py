@@ -40,7 +40,7 @@ class SacAgent(BaseAgent):
             initial_model_state_dict=None,  # Pi model.
             action_squash=1,  # Max magnitude (or None).
             pretrain_std=0.75,  # High value to make near uniform sampling.
-            max_q_eval_mode='none'
+            max_q_eval_mode='pixels'
             ):
         self._max_q_eval_mode = max_q_eval_mode
         if isinstance(ModelCls, str):
@@ -182,77 +182,89 @@ class SacAgent(BaseAgent):
                 locations = np.arange(25).astype('float32')
                 locations = locations[:, None]
                 locations = np.tile(locations, (1, 50))
+                locations = np.tile(locations, (batch_size, 1))
             elif self._max_q_eval_mode == 'state_cloth_corner':
                 locations = np.array([[1, 0, 0, 0], [0, 1, 0, 0],
                                      [0, 0, 1, 0], [0, 0, 0, 1]],
                                      dtype='float32')
                 locations = np.tile(locations, (1, 50))
+                locations = np.tile(locations, (batch_size, 1))
             elif self._max_q_eval_mode == 'state_cloth_point':
                 locations = np.mgrid[0:9, 0:9].reshape(2, 81).T.astype('float32')
                 locations = np.tile(locations, (1, 50)) / 8
-            elif self._max_q_eval_mode == 'pixels_cloth_point':
-                image = observation[0].squeeze(0).cpu().numpy().astype('uint8')
-                segmentation = image < 100
-                locations = np.transpose(np.where(np.any(segmentation, axis=-1))).astype('float32')
-                locations = np.tile(locations, (1, 50)) / 63.
+                locations = np.tile(locations, (batch_size, 1))
 
             observation_pi = self.model.forward_embedding(observation)
             observation_q1 = self.q1_model.forward_embedding(observation)
             observation_q2 = self.q2_model.forward_embedding(observation)
 
-            n_locations = len(locations)
-            observation_pi = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
-                              for o in observation_pi]
-            observation_q1 = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
-                              for o in observation_q1]
-            observation_q2 = [repeat(o, [n_locations] + [1] * len(o.shape[1:]))
-                              for o in observation_q2]
-            locations = np.tile(locations, (batch_size, 1))
-            locations = torch.from_numpy(locations).to(self.device)
+            all_actions, all_means, all_stds = [], [], []
+            for i in range(batch_size):
+                image = observation[0][i].cpu().numpy().astype('uint8')
+                segmentation = image < 100
+                locations = np.transpose(np.where(np.any(segmentation, axis=-1))).astype('float32')
+                locations = np.tile(locations / 63., (1, 50))
 
-            if MaxQInput is None:
-                MaxQInput = namedtuple('MaxQPolicyInput', fields)
-            aug_observation_pi = [locations] + list(observation_pi)
-            aug_observation_pi = MaxQInput(*aug_observation_pi)
-            aug_observation_q1 = [locations] + list(observation_q1)
-            aug_observation_q1 = MaxQInput(*aug_observation_q1)
-            aug_observation_q2 = [locations] + list(observation_q2)
-            aug_observation_q2 = MaxQInput(*aug_observation_q2)
+                n_locations = len(locations)
+                observation_pi_i = [repeat(o[[i]], [n_locations] + [1] * len(o.shape[1:]))
+                                    for o in observation_pi]
+                observation_q1_i = [repeat(o[[i]], [n_locations] + [1] * len(o.shape[1:]))
+                                    for o in observation_q1]
+                observation_q2_i = [repeat(o[[i]], [n_locations] + [1] * len(o.shape[1:]))
+                                    for o in observation_q2]
+                locations = torch.from_numpy(locations).to(self.device)
 
-            mean, log_std = self.model.forward_output(aug_observation_pi)#, prev_action, prev_reward)
+                if MaxQInput is None:
+                    MaxQInput = namedtuple('MaxQPolicyInput', fields)
+                aug_observation_pi = [locations] + list(observation_pi_i)
+                aug_observation_pi = MaxQInput(*aug_observation_pi)
+                aug_observation_q1 = [locations] + list(observation_q1_i)
+                aug_observation_q1 = MaxQInput(*aug_observation_q1)
+                aug_observation_q2 = [locations] + list(observation_q2_i)
+                aug_observation_q2 = MaxQInput(*aug_observation_q2)
 
-            q1 = self.q1_model.forward_output(aug_observation_q1, mean)
-            q2 = self.q2_model.forward_output(aug_observation_q2, mean)
-            q = torch.min(q1, q2)
-            q = q.view(batch_size, n_locations)
+                mean, log_std = self.model.forward_output(aug_observation_pi)#, prev_action, prev_reward)
 
-            values, indices = torch.topk(q, int(threshold * n_locations), dim=-1)
+                q1 = self.q1_model.forward_output(aug_observation_q1, mean)
+                q2 = self.q2_model.forward_output(aug_observation_q2, mean)
+                q = torch.min(q1, q2)
+                #q = q.view(batch_size, n_locations)
 
-            # vmin, vmax = values.min(dim=-1, keepdim=True)[0], values.max(dim=-1, keepdim=True)[0]
-            # values = (values - vmin) / (vmax - vmin)
-            # values = F.log_softmax(values, -1)
-            #
-            # uniform = torch.rand_like(values)
-            # uniform = torch.clamp(uniform, 1e-5, 1 - 1e-5)
-            # gumbel = -torch.log(-torch.log(uniform))
+                values, indices = torch.topk(q, int(threshold * n_locations), dim=-1)
 
-            #sampled_idx = torch.argmax(values + gumbel, dim=-1)
-            sampled_idx = torch.randint(high=int(threshold * n_locations), size=(batch_size,)).to(self.device)
+                # vmin, vmax = values.min(dim=-1, keepdim=True)[0], values.max(dim=-1, keepdim=True)[0]
+                # values = (values - vmin) / (vmax - vmin)
+                # values = F.log_softmax(values, -1)
+                #
+                # uniform = torch.rand_like(values)
+                # uniform = torch.clamp(uniform, 1e-5, 1 - 1e-5)
+                # gumbel = -torch.log(-torch.log(uniform))
 
-            actual_idxs = indices[torch.arange(batch_size), sampled_idx]
-            actual_idxs += (torch.arange(batch_size) * n_locations).to(self.device)
+                #sampled_idx = torch.argmax(values + gumbel, dim=-1)
+                sampled_idx = torch.randint(high=int(threshold * n_locations), size=(1,)).to(self.device)
 
-            location = locations[actual_idxs][:, :2]
-            location = (location - 0.5) / 0.5
-            delta = torch.tanh(mean[actual_idxs])
-            action = torch.cat((location, delta), dim=-1)
+                actual_idxs = indices[sampled_idx]
+                #actual_idxs += (torch.arange(batch_size) * n_locations).to(self.device)
 
+                location = locations[actual_idxs][:, :2]
+                location = (location - 0.5) / 0.5
+                delta = torch.tanh(mean[actual_idxs])
+                action = torch.cat((location, delta), dim=-1)
+
+                mean, log_std = mean[actual_idxs], log_std[actual_idxs]
+
+                all_actions.append(action)
+                all_means.append(mean)
+                all_stds.append(log_std)
+
+            action = torch.cat(all_actions, dim=0)
+            mean, log_std = torch.cat(all_means, dim=0), torch.cat(all_stds, dim=0)
             if no_batch:
                 action = action.squeeze(0)
+                mean = mean.squeeze(0)
+                log_std = log_std.squeeze(0)
 
-            mean, log_std = mean[actual_idxs], log_std[actual_idxs]
             dist_info = DistInfoStd(mean=mean, log_std=log_std)
-
             agent_info = AgentInfo(dist_info=dist_info)
 
             action, agent_info = buffer_to((action, agent_info), device="cpu")
