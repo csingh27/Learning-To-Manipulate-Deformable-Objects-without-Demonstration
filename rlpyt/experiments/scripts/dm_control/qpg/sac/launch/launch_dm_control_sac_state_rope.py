@@ -6,16 +6,16 @@ from rlpyt.utils.launching.variant import make_variants, VariantLevel
 script = "rlpyt/experiments/scripts/dm_control/qpg/sac/train/dm_control_sac.py"
 affinity_code = encode_affinity(
     n_cpu_core=24,
-    n_gpu=8,
+    n_gpu=4,
     contexts_per_gpu=1,
 )
 
-runs_per_setting = 8
-default_config_key = "sac_state_ropev1"
-experiment_title = "sac_dm_control_state_ropev1"
+runs_per_setting = 4
+default_config_key = "sac_state_rope_v2"
+experiment_title = "sac_dm_control_state_ropev2"
 variant_levels = list()
 
-domain = ['rope_v1']
+domain = ['rope_v2']
 task = ['easy']
 values = list(zip(domain, task))
 dir_names = ["env_{}_{}".format(*v) for v in values]
