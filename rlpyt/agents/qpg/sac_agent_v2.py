@@ -140,7 +140,7 @@ class SacAgent(BaseAgent):
         next_actions, next_log_pis, _ = self.pi(*model_inputs)
 
         qs = self.target_q(observation, prev_action, prev_reward, next_actions)
-        min_next_q = torch.min(qs, dim=0)
+        min_next_q = torch.min(torch.stack(qs, dim=0), dim=0)[0]
 
         target_v = min_next_q - self.log_alpha.exp().detach().cpu() * next_log_pis
         return target_v.cpu()
@@ -287,11 +287,8 @@ class SacAgent(BaseAgent):
     def pi_parameters(self):
         return self.model.parameters()
 
-    def q1_parameters(self):
-        return self.q1_model.parameters()
-
-    def q2_parameters(self):
-        return self.q2_model.parameters()
+    def q_parameters(self):
+        return [q.parameters() for q in self.q_models]
 
     def train_mode(self, itr):
         super().train_mode(itr)

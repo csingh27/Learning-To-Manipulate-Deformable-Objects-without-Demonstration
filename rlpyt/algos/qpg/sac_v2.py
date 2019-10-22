@@ -23,7 +23,7 @@ SamplesToBuffer = namedarraytuple("SamplesToRepay",
 
 class SAC(RlAlgorithm):
 
-    opt_info_fields = tuple(f for f in OptInfo._fields)  # copy
+    opt_info_fields = None
 
     def __init__(
             self,
@@ -54,15 +54,6 @@ class SAC(RlAlgorithm):
         del batch_size  # Property.
         save__init__args(locals())
 
-        keys = ["piLoss", "alphaLoss",
-                "piMu", "piLogStd", "alpha", "qMeanDiff",
-                "piMu", "piGradNorm"])
-        keys += [f'q{i}GradNorm' for i in range(self.agent.n_qs)]
-        keys += [f'q{i}' for i in range(self.agent.n_qs)]
-        keys += [f'q{i}Loss' for i in range(self.agent.n_qs)]
-        global OptInfo
-        OptInfo = namedtuple('OptInfo', keys)
-
     def initialize(self, agent, n_itr, batch_spec, mid_batch_reset, examples,
             world_size=1, rank=0):
         """Used in basic or synchronous multi-GPU runners, not async."""
@@ -84,6 +75,16 @@ class SAC(RlAlgorithm):
         if self.target_entropy == 'auto':
             self.target_entropy = -np.prod(self.agent.env_spaces.action.shape)
 
+        keys = ["piLoss", "alphaLoss",
+                "piMu", "piLogStd", "alpha", "piGradNorm"]
+        keys += [f'q{i}GradNorm' for i in range(self.agent.n_qs)]
+        keys += [f'q{i}' for i in range(self.agent.n_qs)]
+        keys += [f'q{i}Loss' for i in range(self.agent.n_qs)]
+        global OptInfo
+        OptInfo = namedtuple('OptInfo', keys)
+
+        SAC.opt_info_fields = tuple(f for f in OptInfo._fields)  # copy
+
     def async_initialize(self, agent, sampler_n_itr, batch_spec, mid_batch_reset,
             examples, world_size=1):
         """Used in async runner only."""
@@ -103,7 +104,7 @@ class SAC(RlAlgorithm):
         self.pi_optimizer = self.OptimCls(self.agent.pi_parameters(),
             lr=self.learning_rate, **self.optim_kwargs)
         self.q_optimizers = [self.OptimCls(q_param)
-                             for q_param in self.agent_q_parameters()]
+                             for q_param in self.agent.q_parameters()]
         self.alpha_optimizer = self.OptimCls([self.agent.log_alpha],
             lr=self.learning_rate, **self.optim_kwargs)
         if self.initial_optim_state_dict is not None:
@@ -153,7 +154,7 @@ class SAC(RlAlgorithm):
 
             q_grad_norms = []
             for q_opt, q_loss, q_param in zip(self.q_optimizers, q_losses,
-                                               self.agent.q_parameters):
+                                               self.agent.q_parameters()):
                 q_opt.zero_grad()
                 q_loss.backward()
                 q_grad_norm = torch.nn.utils.clip_grad_norm_(q_param,
@@ -196,8 +197,8 @@ class SAC(RlAlgorithm):
         new_action, log_pi, (pi_mean, pi_log_std) = self.agent.pi(*agent_inputs)
         if not self.reparameterize:
             new_action = new_action.detach()  # No grad.
-        log_target1, log_target2 = self.agent.q(*agent_inputs, new_action)
-        min_log_target = torch.min(log_target1, log_target2)
+        log_targets = self.agent.q(*agent_inputs, new_action)
+        min_log_target = torch.min(torch.stack(log_targets, dim=0), dim=0)[0]
         prior_log_pi = self.get_action_prior(new_action.cpu())
 
         if self.reparameterize:
@@ -228,7 +229,7 @@ class SAC(RlAlgorithm):
         return prior_log_pi
 
     def append_opt_info_(self, opt_info, q_losses, losses, q_grad_norms,
-                         pi_grad_norm, q_values, ,values):
+                         pi_grad_norm, q_values, values):
         """In-place."""
         pi_loss, alpha_loss = losses
         pi_mean, pi_log_std, alpha = values
