@@ -27,7 +27,7 @@ sac_module = ['sac_v2']#, 'sac_v2_generic']
 sac_agent_module = ['sac_agent_v2']#, 'sac_agent_v2_generic']
 state_keys= [['location', 'pixels']]#, ['pixels']]
 values = list(zip(model_cls, sac_module, sac_agent_module, state_keys))
-dir_names = ["model_cls_{}_rnd_loc_{}".format(*v) for v in values]
+dir_names = ["model_cls_{}".format(*v) for v in values]
 keys = [('agent', 'ModelCls'), ('sac_module',),
         ('sac_agent_module',), ('state_keys',)]
 variant_levels.append(VariantLevel(keys, values, dir_names))
