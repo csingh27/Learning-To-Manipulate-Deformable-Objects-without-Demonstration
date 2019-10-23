@@ -147,7 +147,7 @@ class SacAgent(BaseAgent):
 
     @torch.no_grad()
     def step(self, observation, prev_action, prev_reward):
-        threshold = 1.0
+        threshold = 0.3
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
 
@@ -192,12 +192,6 @@ class SacAgent(BaseAgent):
 
             observation_pi = self.model.forward_embedding(observation)
             observation_qs = [q.forward_embedding(observation) for q in self.q_models]
-
-            all_actions, all_means, all_stds = [], [], []
-            image = observation[0][i].cpu().numpy().astype('uint8')
-            segmentation = image < 100
-            locations = np.transpose(np.where(np.any(segmentation, axis=-1))).astype('float32')
-            locations = np.tile(locations / 63., (1, 50))
 
             n_locations = len(locations)
             observation_pi_i = [repeat(o[[i]], [n_locations] + [1] * len(o.shape[1:]))
@@ -303,15 +297,16 @@ class SacAgent(BaseAgent):
             alpha=self.log_alpha.data
         )
         rtn.update({f'q{i}_model': q.state_dict()
-                    for q in self.q_models})
+                    for i, q in enumerate(self.q_models)})
         rtn.update({f'target_q{i}_model': q.state_dict()
-                    for q in self.target_q_models})
+                    for i, q in enumerate(self.target_q_models)})
         return rtn
 
 
     def load_state_dict(self, state_dict):
         self.model.load_state_dict(state_dict["model"])
         self.log_alpha.data = state_dict['alpha']
+        print(state_dict.keys())
 
         [q.load_state_dict(state_dict[f'q{i}_model'])
          for i, q in enumerate(self.q_models)]

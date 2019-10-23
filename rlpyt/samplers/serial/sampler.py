@@ -35,7 +35,9 @@ class SerialSampler(BaseSampler):
             global_B=global_B, env_ranks=env_ranks)
 
         envs[0].reset()
-        envs[0].step(envs[0].action_space.sample())
+        #envs[0].step(envs[0].action_space.sample())
+        import numpy as np
+        envs[0].step(np.zeros(7))
 
         samples_pyt, samples_np, examples = build_samples_buffer(agent, self.EnvCls, self.env_kwargs,
             self.batch_spec, bootstrap_value, agent_shared=False,

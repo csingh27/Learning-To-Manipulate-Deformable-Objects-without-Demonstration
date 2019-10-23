@@ -157,7 +157,7 @@ config = dict(
     sac_agent_module='sac_agent_v2',
     name='',
     agent=dict(
-        ModelCls='GumbelPiMlpModel',
+        ModelCls='PiMlpModel',
         q_model_kwargs=dict(hidden_sizes=[256, 256]),
         model_kwargs=dict(hidden_sizes=[256, 256]),
     ),

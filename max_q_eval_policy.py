@@ -25,7 +25,7 @@ def main():
     with open(config_file, 'r') as f:
         config = json.load(f)
     config['sampler']['batch_B'] = 1
-    config['sampler']['eval_n_envs'] = 5
+    config['sampler']['eval_n_envs'] = 1
     config['sampler']['eval_max_trajectories'] = args.n_rollouts
     config['env']['task_kwargs']['maxq'] = True
 

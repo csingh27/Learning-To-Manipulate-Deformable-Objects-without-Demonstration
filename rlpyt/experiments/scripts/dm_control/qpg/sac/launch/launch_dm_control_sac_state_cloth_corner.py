@@ -22,12 +22,12 @@ dir_names = ["env_{}_{}".format(*v) for v in values]
 keys = [('env', 'domain'), ('env', 'task')]
 variant_levels.append(VariantLevel(keys, values, dir_names))
 
-model_cls = ['GumbelPiMlpModel'] #['PiMlpModel', 'GumbelPiMlpModel']
-random_location = [False] #[True, False]
-sac_module = ['sac_v2_generic'] #['sac_v2', 'sac_v2_generic']
-sac_agent_module = ['sac_agent_v2_generic'] #['sac_agent_v2', 'sac_agent_v2_generic']
+model_cls = ['PiMlpModel'] #['PiMlpModel', 'GumbelPiMlpModel']
+random_location = [True] #[True, False]
+sac_module = ['sac_v2'] #['sac_v2', 'sac_v2_generic']
+sac_agent_module = ['sac_agent_v2'] #['sac_agent_v2', 'sac_agent_v2_generic']
 values = list(zip(model_cls, random_location, sac_module, sac_agent_module))
-dir_names = ["model_cls_{}_rnd_loc_{}_fourcorners".format(*v) for v in values]
+dir_names = ["cloth_corner".format(*v) for v in values]
 keys = [('agent', 'ModelCls'), ('env', 'task_kwargs', 'random_location'),
         ('sac_module',), ('sac_agent_module',)]
 variant_levels.append(VariantLevel(keys, values, dir_names))
