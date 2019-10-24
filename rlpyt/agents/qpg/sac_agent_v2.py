@@ -41,7 +41,7 @@ class SacAgent(BaseAgent):
             action_squash=1,  # Max magnitude (or None).
             pretrain_std=0.75,  # High value to make near uniform sampling.
             max_q_eval_mode='none',
-            n_qs=2,
+            n_qs=1,
             ):
         self._max_q_eval_mode = max_q_eval_mode
         if isinstance(ModelCls, str):
@@ -180,7 +180,7 @@ class SacAgent(BaseAgent):
             if self._max_q_eval_mode == 'state_rope':
                 locations = np.arange(25).astype('float32')
                 locations = locations[:, None]
-                locations = np.tile(locations, (1, 50))
+                locations = np.tile(locations, (1, 50)) / 24
             elif self._max_q_eval_mode == 'state_cloth_corner':
                 locations = np.array([[1, 0, 0, 0], [0, 1, 0, 0],
                                      [0, 0, 1, 0], [0, 0, 0, 1]],
@@ -189,14 +189,9 @@ class SacAgent(BaseAgent):
             elif self._max_q_eval_mode == 'state_cloth_point':
                 locations = np.mgrid[0:9, 0:9].reshape(2, 81).T.astype('float32')
                 locations = np.tile(locations, (1, 50)) / 8
-            elif self._max_q_eval_mode == 'state_rope':
-                locations = np.arange(25)[:, None]
-                locations = np.tile(locations, (1, 50)) / 24
             elif self._max_q_eval_mode == 'pixel_rope':
                 image = observation[0].squeeze(0).cpu().numpy()
-                print(image.shape)
                 locations = np.transpose(np.where(np.all(image > 150, axis=2)))
-                print(locations.shape)
 
             observation_pi = self.model.forward_embedding(observation)
             observation_qs = [q.forward_embedding(observation) for q in self.q_models]
@@ -242,8 +237,8 @@ class SacAgent(BaseAgent):
             actual_idxs = indices[sampled_idx]
             #actual_idxs += (torch.arange(batch_size) * n_locations).to(self.device)
 
-            location = locations[actual_idxs][:, :4]
-            # location = (location - 0.5) / 0.5
+            location = locations[actual_idxs][:, :1]
+            location = (location - 0.5) / 0.5
             delta = torch.tanh(mean[actual_idxs])
             action = torch.cat((location, delta), dim=-1)
 
