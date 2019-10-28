@@ -324,7 +324,7 @@ config = dict(
     model=dict(),
     optim=dict(),
     runner=dict(
-        n_steps=3e5,
+        n_steps=5e5,
         log_interval_steps=1e4,
     ),
     sampler=dict(
@@ -339,7 +339,7 @@ config = dict(
     env=dict(
         domain='rope_sac',
         task='easy',
-        max_path_length=100,
+        max_path_length=200,
         pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
                                   render_kwargs=dict(width=64, height=64, camera_id=0)),
         task_kwargs=dict() # to not return positions and only pick location

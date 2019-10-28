@@ -1,4 +1,5 @@
 from collections import namedtuple
+import math
 import numpy as np
 import torch
 import torch.nn as nn
@@ -41,7 +42,7 @@ class SacAgent(BaseAgent):
             action_squash=1,  # Max magnitude (or None).
             pretrain_std=0.75,  # High value to make near uniform sampling.
             max_q_eval_mode='none',
-            n_qs=1,
+            n_qs=2,
             ):
         self._max_q_eval_mode = max_q_eval_mode
         if isinstance(ModelCls, str):
@@ -191,7 +192,10 @@ class SacAgent(BaseAgent):
                 locations = np.tile(locations, (1, 50)) / 8
             elif self._max_q_eval_mode == 'pixel_rope':
                 image = observation[0].squeeze(0).cpu().numpy()
-                locations = np.transpose(np.where(np.all(image > 150, axis=2)))
+                locations = np.transpose(np.where(np.all(image > 150, axis=2))).astype('float32')
+                if locations.shape[0] == 0:
+                    locations = np.array([[-1, -1]], dtype='float32')
+                locations = np.tile(locations, (1, 50)) / 63
 
             observation_pi = self.model.forward_embedding(observation)
             observation_qs = [q.forward_embedding(observation) for q in self.q_models]
@@ -221,7 +225,7 @@ class SacAgent(BaseAgent):
             q = torch.min(torch.stack(qs, dim=0), dim=0)[0]
             #q = q.view(batch_size, n_locations)
 
-            values, indices = torch.topk(q, int(threshold * n_locations), dim=-1)
+            values, indices = torch.topk(q, math.ceil(threshold * n_locations), dim=-1)
 
             # vmin, vmax = values.min(dim=-1, keepdim=True)[0], values.max(dim=-1, keepdim=True)[0]
             # values = (values - vmin) / (vmax - vmin)
@@ -232,7 +236,7 @@ class SacAgent(BaseAgent):
             # gumbel = -torch.log(-torch.log(uniform))
 
             #sampled_idx = torch.argmax(values + gumbel, dim=-1)
-            sampled_idx = torch.randint(high=int(threshold * n_locations), size=(1,)).to(self.device)
+            sampled_idx = torch.randint(high=math.ceil(threshold * n_locations), size=(1,)).to(self.device)
 
             actual_idxs = indices[sampled_idx]
             #actual_idxs += (torch.arange(batch_size) * n_locations).to(self.device)
