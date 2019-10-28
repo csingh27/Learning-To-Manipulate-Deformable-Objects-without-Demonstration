@@ -148,7 +148,7 @@ class SacAgent(BaseAgent):
 
     @torch.no_grad()
     def step(self, observation, prev_action, prev_reward):
-        threshold = 1.0
+        threshold = 0.2
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
 
@@ -196,6 +196,12 @@ class SacAgent(BaseAgent):
                 if locations.shape[0] == 0:
                     locations = np.array([[-1, -1]], dtype='float32')
                 locations = np.tile(locations, (1, 50)) / 63
+            elif self._max_q_eval_mode == 'pixel_cloth':
+                image = observation[0].squeeze(0).cpu().numpy()
+                locations = np.transpose(np.where(np.any(image < 100, axis=-1))).astype('float32')
+                locations = np.tile(locations, (1, 50)) / 63
+            else:
+                raise Exception()
 
             observation_pi = self.model.forward_embedding(observation)
             observation_qs = [q.forward_embedding(observation) for q in self.q_models]
