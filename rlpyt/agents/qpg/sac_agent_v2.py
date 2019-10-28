@@ -148,7 +148,7 @@ class SacAgent(BaseAgent):
 
     @torch.no_grad()
     def step(self, observation, prev_action, prev_reward):
-        threshold = 0.2
+        threshold = 1.0
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
 
@@ -172,88 +172,88 @@ class SacAgent(BaseAgent):
                     observation = [observation.position.unsqueeze(0)]
                 else:
                     observation = [observation.pixels.unsqueeze(0)]
+                batch_size = 1
             else:
                 if 'state' in self._max_q_eval_mode:
                     observation = [observation.position]
                 else:
                     observation = [observation.pixels]
-
-            if self._max_q_eval_mode == 'state_rope':
-                locations = np.arange(25).astype('float32')
-                locations = locations[:, None]
-                locations = np.tile(locations, (1, 50)) / 24
-            elif self._max_q_eval_mode == 'state_cloth_corner':
-                locations = np.array([[1, 0, 0, 0], [0, 1, 0, 0],
-                                     [0, 0, 1, 0], [0, 0, 0, 1]],
-                                     dtype='float32')
-                locations = np.tile(locations, (1, 50))
-            elif self._max_q_eval_mode == 'state_cloth_point':
-                locations = np.mgrid[0:9, 0:9].reshape(2, 81).T.astype('float32')
-                locations = np.tile(locations, (1, 50)) / 8
-            elif self._max_q_eval_mode == 'pixel_rope':
-                image = observation[0].squeeze(0).cpu().numpy()
-                locations = np.transpose(np.where(np.all(image > 150, axis=2))).astype('float32')
-                if locations.shape[0] == 0:
-                    locations = np.array([[-1, -1]], dtype='float32')
-                locations = np.tile(locations, (1, 50)) / 63
-            elif self._max_q_eval_mode == 'pixel_cloth':
-                image = observation[0].squeeze(0).cpu().numpy()
-                locations = np.transpose(np.where(np.any(image < 100, axis=-1))).astype('float32')
-                locations = np.tile(locations, (1, 50)) / 63
-            else:
-                raise Exception()
+                batch_size = observation[0].shape[0]
 
             observation_pi = self.model.forward_embedding(observation)
             observation_qs = [q.forward_embedding(observation) for q in self.q_models]
 
-            n_locations = len(locations)
-            observation_pi_i = [repeat(o[[i]], [n_locations] + [1] * len(o.shape[1:]))
-                                for o in observation_pi]
-            observation_qs_i = [[repeat(o, [n_locations] + [1] * len(o.shape[1:]))
-                                 for o in observation_q]
-                                for observation_q in observation_qs]
-            locations = torch.from_numpy(locations).to(self.device)
+            actions, means, log_stds = [], [], []
+            for i in range(batch_size):
+                if self._max_q_eval_mode == 'state_rope':
+                    locations = np.arange(25).astype('float32')
+                    locations = locations[:, None]
+                    locations = np.tile(locations, (1, 50)) / 24
+                elif self._max_q_eval_mode == 'state_cloth_corner':
+                    locations = np.array([[1, 0, 0, 0], [0, 1, 0, 0],
+                                         [0, 0, 1, 0], [0, 0, 0, 1]],
+                                         dtype='float32')
+                    locations = np.tile(locations, (1, 50))
+                elif self._max_q_eval_mode == 'state_cloth_point':
+                    locations = np.mgrid[0:9, 0:9].reshape(2, 81).T.astype('float32')
+                    locations = np.tile(locations, (1, 50)) / 8
+                elif self._max_q_eval_mode == 'pixel_rope':
+                    image = observation[0][i].cpu().numpy()
+                    locations = np.transpose(np.where(np.all(image > 150, axis=2))).astype('float32')
+                    if locations.shape[0] == 0:
+                        locations = np.array([[-1, -1]], dtype='float32')
+                    locations = np.tile(locations, (1, 50)) / 63
+                elif self._max_q_eval_mode == 'pixel_cloth':
+                    image = observation[0][i].cpu().numpy()
+                    locations = np.transpose(np.where(np.any(image < 100, axis=-1))).astype('float32')
+                    locations = np.tile(locations, (1, 50)) / 63
+                else:
+                    raise Exception()
 
-            if MaxQInput is None:
-                MaxQInput = namedtuple('MaxQPolicyInput', fields)
+                n_locations = len(locations)
+                observation_pi_i = [repeat(o[[i]], [n_locations] + [1] * len(o.shape[1:]))
+                                    for o in observation_pi]
+                observation_qs_i = [[repeat(o[[i]], [n_locations] + [1] * len(o.shape[1:]))
+                                     for o in observation_q]
+                                    for observation_q in observation_qs]
+                locations = torch.from_numpy(locations).to(self.device)
 
-            aug_observation_pi = [locations] + list(observation_pi_i)
-            aug_observation_pi = MaxQInput(*aug_observation_pi)
-            aug_observation_qs = [[locations] + list(observation_q_i)
-                                  for observation_q_i in observation_qs_i]
-            aug_observation_qs = [MaxQInput(*aug_observation_q)
-                                  for aug_observation_q in aug_observation_qs]
+                if MaxQInput is None:
+                    MaxQInput = namedtuple('MaxQPolicyInput', fields)
 
-            mean, log_std = self.model.forward_output(aug_observation_pi)#, prev_action, prev_reward)
+                aug_observation_pi = [locations] + list(observation_pi_i)
+                aug_observation_pi = MaxQInput(*aug_observation_pi)
+                aug_observation_qs = [[locations] + list(observation_q_i)
+                                      for observation_q_i in observation_qs_i]
+                aug_observation_qs = [MaxQInput(*aug_observation_q)
+                                      for aug_observation_q in aug_observation_qs]
 
-            qs = [q.forward_output(aug_obs, mean) for q, aug_obs
-                  in zip(self.q_models, aug_observation_qs)]
-            q = torch.min(torch.stack(qs, dim=0), dim=0)[0]
-            #q = q.view(batch_size, n_locations)
+                mean, log_std = self.model.forward_output(aug_observation_pi)#, prev_action, prev_reward)
 
-            values, indices = torch.topk(q, math.ceil(threshold * n_locations), dim=-1)
+                qs = [q.forward_output(aug_obs, mean) for q, aug_obs
+                      in zip(self.q_models, aug_observation_qs)]
+                q = torch.min(torch.stack(qs, dim=0), dim=0)[0]
 
-            # vmin, vmax = values.min(dim=-1, keepdim=True)[0], values.max(dim=-1, keepdim=True)[0]
-            # values = (values - vmin) / (vmax - vmin)
-            # values = F.log_softmax(values, -1)
-            #
-            # uniform = torch.rand_like(values)
-            # uniform = torch.clamp(uniform, 1e-5, 1 - 1e-5)
-            # gumbel = -torch.log(-torch.log(uniform))
+                values, indices = torch.topk(q, math.ceil(threshold * n_locations), dim=-1)
 
-            #sampled_idx = torch.argmax(values + gumbel, dim=-1)
-            sampled_idx = torch.randint(high=math.ceil(threshold * n_locations), size=(1,)).to(self.device)
+                sampled_idx = torch.randint(high=math.ceil(threshold * n_locations), size=(1,)).to(self.device)
 
-            actual_idxs = indices[sampled_idx]
-            #actual_idxs += (torch.arange(batch_size) * n_locations).to(self.device)
+                actual_idxs = indices[sampled_idx]
 
-            location = locations[actual_idxs][:, :1]
-            location = (location - 0.5) / 0.5
-            delta = torch.tanh(mean[actual_idxs])
-            action = torch.cat((location, delta), dim=-1)
+                location = locations[actual_idxs][:, :1]
+                location = (location - 0.5) / 0.5
+                delta = torch.tanh(mean[actual_idxs])
+                action = torch.cat((location, delta), dim=-1)
 
-            mean, log_std = mean[actual_idxs], log_std[actual_idxs]
+                mean, log_std = mean[actual_idxs], log_std[actual_idxs]
 
+                actions.append(action)
+                means.append(mean)
+                log_stds.append(log_std)
+
+            action = torch.stack(actions, dim=0)
+            mean = torch.stack(means, dim=0)
+            log_std = torch.stack(log_stds, dim=0)
             if no_batch:
                 action = action.squeeze(0)
                 mean = mean.squeeze(0)
