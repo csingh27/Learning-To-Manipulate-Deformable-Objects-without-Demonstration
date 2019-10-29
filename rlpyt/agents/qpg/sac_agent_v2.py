@@ -17,6 +17,7 @@ from rlpyt.utils.logging import logger
 from rlpyt.models.utils import update_state_dict
 from rlpyt.utils.collections import namedarraytuple
 from rlpyt.utils.tensor import repeat, batched_index_select
+from rlpyt.utils.constants import *
 
 
 MIN_LOG_STD = -20
@@ -41,7 +42,7 @@ class SacAgent(BaseAgent):
             initial_model_state_dict=None,  # Pi model.
             action_squash=1,  # Max magnitude (or None).
             pretrain_std=0.75,  # High value to make near uniform sampling.
-            max_q_eval_mode='none',
+            max_q_eval_mode='state_cloth_point',
             n_qs=2,
             ):
         self._max_q_eval_mode = max_q_eval_mode
@@ -148,7 +149,7 @@ class SacAgent(BaseAgent):
 
     @torch.no_grad()
     def step(self, observation, prev_action, prev_reward):
-        threshold = 1.0
+        threshold = 0.2
         model_inputs = buffer_to((observation, prev_action, prev_reward),
             device=self.device)
 
@@ -240,12 +241,14 @@ class SacAgent(BaseAgent):
 
                 actual_idxs = indices[sampled_idx]
 
-                location = locations[actual_idxs][:, :1]
+                location = locations[actual_idxs][:, :LOCATION]
                 location = (location - 0.5) / 0.5
                 delta = torch.tanh(mean[actual_idxs])
                 action = torch.cat((location, delta), dim=-1)
 
                 mean, log_std = mean[actual_idxs], log_std[actual_idxs]
+
+                action, mean, log_std = action.squeeze(0), mean.squeeze(0), log_std.squeeze(0)
 
                 actions.append(action)
                 means.append(mean)

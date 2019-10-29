@@ -6,6 +6,7 @@ from rlpyt.utils.buffer import buffer_from_example, torchify_buffer
 from rlpyt.agents.base import AgentInputs
 from rlpyt.samplers.collections import (Samples, AgentSamples, AgentSamplesBsv,
     EnvSamples)
+from rlpyt.utils.constants import *
 
 
 def build_samples_buffer(agent, EnvCls, env_kwargs, batch_spec, bootstrap_value=False,
@@ -65,7 +66,9 @@ def get_example_outputs(agent, EnvCls, env_kwargs, examples, subprocess=False):
         torch.set_num_threads(1)  # Some fix to prevent MKL hang.
     env = EnvCls(**env_kwargs)
     o = env.reset()
-    a = env.action_space.sample()
+#    a = env.action_space.sample()
+    import numpy as np
+    a = np.zeros(LOCATION + DELTA)
     o, r, d, env_info = env.step(a)
     r = np.asarray(r, dtype="float32")  # Must match torch float dtype here.
     agent.reset()
@@ -78,5 +81,5 @@ def get_example_outputs(agent, EnvCls, env_kwargs, examples, subprocess=False):
     examples["reward"] = r
     examples["done"] = d
     examples["env_info"] = env_info
-    examples["action"] = a  # OK to put torch tensor here, could numpify.
+    examples["action"] = a[LOCATION:]  # OK to put torch tensor here, could numpify.
     examples["agent_info"] = agent_info

@@ -1,0 +1,2 @@
+LOCATION = 2
+DELTA = 3

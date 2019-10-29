@@ -190,7 +190,7 @@ config = dict(
         domain='cloth_corner',
         task='easy',
         max_path_length=120,
-        task_kwargs=dict(random_location=True)
+        task_kwargs=dict(random_location=True, maxq=True)
     ),
 )
 configs["sac_state_cloth_corner"] = config

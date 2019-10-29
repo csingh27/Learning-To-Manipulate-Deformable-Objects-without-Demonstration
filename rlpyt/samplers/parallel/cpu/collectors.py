@@ -6,7 +6,7 @@ from rlpyt.samplers.collectors import (DecorrelatingStartCollector,
 from rlpyt.agents.base import AgentInputs
 from rlpyt.utils.buffer import (torchify_buffer, numpify_buffer, buffer_from_example,
     buffer_method)
-
+from rlpyt.utils.constants import *
 
 class CpuResetCollector(DecorrelatingStartCollector):
 
@@ -19,7 +19,7 @@ class CpuResetCollector(DecorrelatingStartCollector):
         completed_infos = list()
         observation, action, reward = agent_inputs
         obs_pyt, act_pyt, rew_pyt = torchify_buffer(agent_inputs)
-        agent_buf.prev_action[0] = action  # Leading prev_action.
+        agent_buf.prev_action[0] = action[:, LOCATION:]  # Leading prev_action.
         env_buf.prev_reward[0] = reward
         self.agent.sample_mode(itr)
         for t in range(self.batch_T):
@@ -27,7 +27,7 @@ class CpuResetCollector(DecorrelatingStartCollector):
             # Agent inputs and outputs are torch tensors.
             act_pyt, agent_info = self.agent.step(obs_pyt, act_pyt, rew_pyt)
             action = numpify_buffer(act_pyt)
-            env_buf.observation.location = action[:2]
+            env_buf.observation.location[t, :] = np.tile(action[:, :LOCATION], (1, 50))
             for b, env in enumerate(self.envs):
                 # Environment inputs and outputs are numpy arrays.
                 o, r, d, env_info = env.step(action[b])
@@ -44,7 +44,7 @@ class CpuResetCollector(DecorrelatingStartCollector):
                 env_buf.done[t, b] = d
                 if env_info:
                     env_buf.env_info[t, b] = env_info
-            agent_buf.action[t] = action
+            agent_buf.action[t] = action[:, LOCATION:]
             env_buf.reward[t] = reward
             if agent_info:
                 agent_buf.agent_info[t] = agent_info

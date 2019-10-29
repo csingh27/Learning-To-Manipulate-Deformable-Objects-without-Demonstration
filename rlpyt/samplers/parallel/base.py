@@ -9,6 +9,7 @@ from rlpyt.samplers.parallel.worker import sampling_process
 from rlpyt.utils.logging import logger
 from rlpyt.utils.collections import AttrDict
 from rlpyt.utils.synchronize import drain_queue
+from rlpyt.utils.constants import *
 
 
 EVAL_TRAJ_CHECK = 0.1  # seconds.
@@ -54,7 +55,9 @@ class ParallelSamplerBase(BaseSampler):
         else:
             env = self.EnvCls(**self.env_kwargs)
             env.reset()
-            env.step(env.action_space.sample())
+            import numpy as np
+            env.step(np.zeros(LOCATION + DELTA))
+            #env.step(env.action_space.sample())
             self._agent_init(agent, env.spaces, global_B=global_B,
                              env_ranks=env_ranks)
         examples = self._build_buffers(self.EnvCls, self.env_kwargs, bootstrap_value)

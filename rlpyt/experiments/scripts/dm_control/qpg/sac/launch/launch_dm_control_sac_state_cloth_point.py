@@ -12,7 +12,7 @@ affinity_code = encode_affinity(
 
 runs_per_setting = 4
 default_config_key = "sac_state_cloth_corner"
-experiment_title = "sac_dm_control_state_cloth_point"
+experiment_title = "sac_dm_control_state_cloth_point_maxq"
 variant_levels = list()
 
 domain = ['cloth_point_state']
