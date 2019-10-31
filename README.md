@@ -2,6 +2,8 @@
 
 # Learning to Manipulate Deformable Objects without Demonstrations
 
+This is the code that corresponds to the [paper](https://arxiv.org/abs/1910.13439)
+
 ## rlpyt Usage
 See the [original library](https://github.com/astooke/rlpyt) for more information on the design of the library
 
