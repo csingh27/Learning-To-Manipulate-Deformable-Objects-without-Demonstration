@@ -7,13 +7,13 @@ import numpy as np
 import imageio
 
 domain = 'rope_sac'
-n_trajectories =  1
+n_samples = 80000
 root = join('data', 'rope_data')
 
 env_args = dict(
     domain='rope_sac',
     task='easy',
-    max_path_length=1000,
+    max_path_length=100,
     pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
                               render_kwargs=dict(width=64, height=64, camera_id=0)),
     #task_kwargs=dict(random_location=True, pixels_only=True) # to not return positions and only pick location
@@ -23,9 +23,13 @@ if not exists(root):
     os.makedirs(root)
 
 env = DMControlEnv(**env_args)
+total = 0
 
-for i in tqdm(range(n_trajectories)):
-    run_folder = join(root, f'run{i}')
+pbar = tqdm(total=n_samples)
+cur_episode = 0
+while total < n_samples:
+    str_i = str(cur_episode)
+    run_folder = join(root, 'run{}'.format(str_i.zfill(4)))
     if not exists(run_folder):
         os.makedirs(run_folder)
 
@@ -34,7 +38,10 @@ for i in tqdm(range(n_trajectories)):
     for t in itertools.count():
         a = env.action_space.sample()
         actions.append(np.concatenate((o.location[:2], a)))
-        imageio.imwrite(join(run_folder, f'img_{t}.jpg'), o.pixels.astype('uint8'))
+        str_t = str(t)
+        imageio.imwrite(join(run_folder, 'img_{}.png'.format(str_t.zfill(3))), o.pixels.astype('uint8'))
+        pbar.update(1)
+        total += 1
 
         o, _, terminal, info = env.step(a)
         if terminal or info.traj_done:
@@ -42,3 +49,4 @@ for i in tqdm(range(n_trajectories)):
 
     actions = np.stack(actions, axis=0)
     np.save(join(run_folder, 'actions.npy'), actions)
+    cur_episode += 1
