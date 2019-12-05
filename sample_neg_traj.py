@@ -22,8 +22,6 @@ def worker(worker_id, start, end):
         #task_kwargs=dict(random_location=True, pixels_only=True) # to not return positions and only pick location
     )
     env = DMControlEnv(**env_args)
-    total = 0
-
     if worker_id == 0:
         pbar = tqdm(total=end - start)
 
@@ -37,6 +35,7 @@ def worker(worker_id, start, end):
 
         actions = []
         env.set_state(saved_state)
+        o = env.get_obs()
         for t in itertools.count():
             a = env.action_space.sample()
             a = a / np.linalg.norm(a) * 1

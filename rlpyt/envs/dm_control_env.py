@@ -167,6 +167,13 @@ class DMControlEnv(Env):
                                             camera_id=cameria_id, **kwargs)
         raise NotImplementedError(mode)
 
+    def get_obs(self):
+        obs = self._env.task.get_observation(self._env.physics)
+        obs = self._filter_observation(obs)
+        obs = Observation(**{k: v for k, v in obs.items()
+                             if k in self._observation_keys})
+        return obs
+
     def get_state(self):
         return self.env.physics.get_state()
 
