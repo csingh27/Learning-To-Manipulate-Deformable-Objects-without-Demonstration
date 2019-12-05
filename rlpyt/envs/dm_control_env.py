@@ -167,6 +167,12 @@ class DMControlEnv(Env):
                                             camera_id=cameria_id, **kwargs)
         raise NotImplementedError(mode)
 
+    def get_state(self):
+        return self.env.physics.get_state()
+
+    def set_state(self, state):
+        self.env.physics.set_state(state)
+
     @property
     def spaces(self):
         return EnvSpaces(
