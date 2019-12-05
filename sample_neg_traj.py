@@ -77,10 +77,9 @@ if __name__ == '__main__':
     if not exists(root):
         os.makedirs(root)
 
-    n_trajectories = 10
-    n_chunks = 1
+    n_trajectories = 4000
     n_neg_samples = 100
-    #n_chunks = mp.cpu_count()
+    n_chunks = mp.cpu_count()
     partition_size = math.ceil(n_trajectories / n_chunks)
     args_list = []
     for i in range(n_chunks):
