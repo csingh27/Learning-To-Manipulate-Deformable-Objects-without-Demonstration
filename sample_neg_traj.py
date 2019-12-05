@@ -25,28 +25,41 @@ def worker(worker_id, start, end):
     if worker_id == 0:
         pbar = tqdm(total=end - start)
 
-    o = env.reset()
-    saved_state = env.get_state()
-
     for i in range(start, end):
         str_i = str(i)
         run_folder = join(root, 'run{}'.format(str_i.zfill(5)))
         if not exists(run_folder):
             os.makedirs(run_folder)
 
+        o = env.reset()
+        imageio.imwrite(join(run_folder, 'img_{}_{}.png'.format('0'.zfill(2), '0'.zfill(3))), o.pixels.astype('uint8'))
         actions = []
-        env.set_state(saved_state)
-        env.step(np.array([0, 0])) # need a non-action so that next get_obs is correct
-        env._step_count -= 1
-        o = env.get_obs()
-        for t in itertools.count():
+        for t in itertools.count(start=1):
+            saved_state = env.get_state()
+            str_t = str(t)
+            actions_t = []
+            for k in range(n_neg_samples):
+                str_k = str(k + 1) # start at 1
+
+                a = env.action_space.sample()
+                a = a / np.linalg.norm(a) * np.sqrt(2)
+                actions_t.append(np.concatenate((o.location[:2], a))) # need to add before b/c o is replaced
+                o, _, terminal, info = env.step(a)
+
+                imageio.imwrite(join(run_folder, 'img_{}_{}.png'.format(str_t.zfill(2), str_k.zfill(3))), o.pixels.astype('uint8'))
+
+                env.set_state(saved_state)
+                env.step(np.array([0, 0]))
+                env._step_count -= 1
+
             a = env.action_space.sample()
             a = a / np.linalg.norm(a) * np.sqrt(2)
-            actions.append(np.concatenate((o.location[:2], a)))
-            str_t = str(t)
-            imageio.imwrite(join(run_folder, 'img_{}.png'.format(str_t.zfill(2))), o.pixels.astype('uint8'))
-
             o, _, terminal, info = env.step(a)
+
+            actions_t.insert(0, np.concatenate((o.location[:2], a)))
+            imageio.imwrite(join(run_folder, 'img_{}_{}.png'.format(str_t.zfill(2), '0'.zfill(3))), o.pixels.astype('uint8'))
+
+            actions.append(np.stack(actions_t, axis=0))
             if terminal or info.traj_done:
                 break
 
