@@ -27,6 +27,7 @@ def worker(worker_id, start, end):
 
     o = env.reset()
     saved_state = env.get_state()
+
     for i in range(start, end):
         str_i = str(i)
         run_folder = join(root, 'run{}'.format(str_i.zfill(5)))
@@ -35,10 +36,12 @@ def worker(worker_id, start, end):
 
         actions = []
         env.set_state(saved_state)
+        env.step(np.array([0, 0])) # need a non-action so that next get_obs is correct
+        env._step_count -= 1
         o = env.get_obs()
         for t in itertools.count():
             a = env.action_space.sample()
-            a = a / np.linalg.norm(a) * 1
+            a = a / np.linalg.norm(a) * np.sqrt(2)
             actions.append(np.concatenate((o.location[:2], a)))
             str_t = str(t)
             imageio.imwrite(join(run_folder, 'img_{}.png'.format(str_t.zfill(2))), o.pixels.astype('uint8'))
