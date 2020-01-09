@@ -11,11 +11,11 @@ affinity_code = encode_affinity(
 )
 
 runs_per_setting = 4
-default_config_key = "sac_pixels_cloth_corner"
-experiment_title = "sac_dm_control_pixels_cloth_two_hand_fixed_env"
+default_config_key = "sac_pixels_rope"
+experiment_title = "pixels_rope_two_hand_fixed_geom"
 variant_levels = list()
 
-domain = ['cloth_two_hand']
+domain = ['rope_two_hand']
 task = ['easy']
 values = list(zip(domain, task))
 dir_names = ["env_{}_{}".format(*v) for v in values]
@@ -23,14 +23,13 @@ keys = [('env', 'domain'), ('env', 'task')]
 variant_levels.append(VariantLevel(keys, values, dir_names))
 
 model_cls = ['PiConvModel']#, 'GumbelPiConvModel']
-random_location = [True]#, False]
 sac_module = ['sac_v2']#, 'sac_v2_generic']
 sac_agent_module = ['sac_agent_v2']#, 'sac_agent_v2_generic']
 state_keys= [['location', 'pixels']]#, ['pixels']]
-values = list(zip(model_cls, random_location, sac_module, sac_agent_module, state_keys))
-dir_names = ["model_cls_{}_rnd_loc_{}".format(*v) for v in values]
-keys = [('agent', 'ModelCls'), ('env', 'task_kwargs', 'random_location'),
-        ('sac_module',), ('sac_agent_module',), ('state_keys',)]
+values = list(zip(model_cls, sac_module, sac_agent_module, state_keys))
+dir_names = ["model_cls_{}".format(*v) for v in values]
+keys = [('agent', 'ModelCls'), ('sac_module',),
+        ('sac_agent_module',), ('state_keys',)]
 variant_levels.append(VariantLevel(keys, values, dir_names))
 
 variants, log_dirs = make_variants(*variant_levels)

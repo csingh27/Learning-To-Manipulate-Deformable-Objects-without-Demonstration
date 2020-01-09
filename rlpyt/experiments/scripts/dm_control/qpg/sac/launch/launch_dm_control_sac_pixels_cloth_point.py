@@ -5,14 +5,14 @@ from rlpyt.utils.launching.variant import make_variants, VariantLevel
 
 script = "rlpyt/experiments/scripts/dm_control/qpg/sac/train/dm_control_sac.py"
 affinity_code = encode_affinity(
-    n_cpu_core=24,
+    n_cpu_core=20,
     n_gpu=4,
     contexts_per_gpu=1,
 )
 
 runs_per_setting = 4
 default_config_key = "sac_pixels_cloth_corner"
-experiment_title = "pixels_cloth_point_ours_nqs1"
+experiment_title = "pixels_cloth_point_rolled_back_lower_starting"
 variant_levels = list()
 
 domain = ['cloth_point']
