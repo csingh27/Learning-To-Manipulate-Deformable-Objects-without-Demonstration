@@ -11,15 +11,15 @@ import multiprocessing as mp
 
 
 def worker(worker_id, start, end):
-    np.random.seed(worker_id)
+    np.random.seed(worker_id+1)
     # Initialize environment
     env_args = dict(
-        domain='rope_sac',
+        domain='rope_colored',
         task='easy',
-        max_path_length=5,
+        max_path_length=10,
         pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
                                   render_kwargs=dict(width=64, height=64, camera_id=0)),
-        #task_kwargs=dict(random_location=True, pixels_only=True) # to not return positions and only pick location
+        task_kwargs=dict(random_pick=True)
     )
     env = DMControlEnv(**env_args)
     if worker_id == 0:
@@ -34,8 +34,9 @@ def worker(worker_id, start, end):
         o = env.reset()
         imageio.imwrite(join(run_folder, 'img_{}_{}.png'.format('0'.zfill(2), '0'.zfill(3))), o.pixels.astype('uint8'))
         actions = []
+        env_states = [env.get_state()]
         for t in itertools.count(start=1):
-            saved_state = env.get_state()
+            saved_state = env.get_state(ignore_step=False)
             str_t = str(t)
             actions_t = []
             for k in range(n_neg_samples):
@@ -48,23 +49,26 @@ def worker(worker_id, start, end):
 
                 imageio.imwrite(join(run_folder, 'img_{}_{}.png'.format(str_t.zfill(2), str_k.zfill(3))), o.pixels.astype('uint8'))
 
-                env.set_state(saved_state)
+                env.set_state(saved_state, ignore_step=False)
                 env.step(np.array([0, 0]))
                 env._step_count -= 1
+                o = env.get_obs()
 
             a = env.action_space.sample()
-            a = a / np.linalg.norm(a) * np.sqrt(2)
-            o, _, terminal, info = env.step(a)
-
+            a = a / np.linalg.norm(a)
             actions_t.insert(0, np.concatenate((o.location[:2], a)))
+            o, _, terminal, info = env.step(a)
+            env_states.append(env.get_state())
+
             imageio.imwrite(join(run_folder, 'img_{}_{}.png'.format(str_t.zfill(2), '0'.zfill(3))), o.pixels.astype('uint8'))
 
             actions.append(np.stack(actions_t, axis=0))
             if terminal or info.traj_done:
                 break
-
+        env_states = np.stack(env_states, axis=0)
         actions = np.stack(actions, axis=0)
         np.save(join(run_folder, 'actions.npy'), actions)
+        np.save(join(run_folder, 'env_states.npy'), env_states)
 
         if worker_id == 0:
             pbar.update(1)
@@ -77,8 +81,8 @@ if __name__ == '__main__':
     if not exists(root):
         os.makedirs(root)
 
-    n_trajectories = 4000
-    n_neg_samples = 100
+    n_trajectories = 2500
+    n_neg_samples = 5
     n_chunks = mp.cpu_count()
     partition_size = math.ceil(n_trajectories / n_chunks)
     args_list = []

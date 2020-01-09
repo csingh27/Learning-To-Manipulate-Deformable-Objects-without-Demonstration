@@ -175,12 +175,19 @@ class DMControlEnv(Env):
                              if k in self._observation_keys})
         return obs
 
-    def get_state(self):
+    def get_state(self, ignore_step=True):
+        if ignore_step:
+            return self._env.physics.get_state()
         return self._env.physics.get_state(), self._step_count
 
-    def set_state(self, state):
-        self._env.physics.set_state(state[0])
-        self._step_count = state[1]
+    def set_state(self, state, ignore_step=True):
+        if ignore_step:
+            self._env.physics.set_state(state)
+            self._env.step(np.zeros(self.action_space.shape))
+        else:
+            self._env.physics.set_state(state[0])
+            self._env.step(np.zeros(self.action_space.shape))
+            self._step_count = state[1]
 
     @property
     def spaces(self):
