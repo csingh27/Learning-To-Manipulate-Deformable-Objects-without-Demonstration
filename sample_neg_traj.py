@@ -1,4 +1,5 @@
 from rlpyt.envs.dm_control_env import DMControlEnv
+import json
 import math
 import time
 import os
@@ -9,18 +10,18 @@ import numpy as np
 import imageio
 import multiprocessing as mp
 
+env_args = dict(
+    domain='rope_colored',
+    task='easy',
+    max_path_length=10,
+    pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
+                              render_kwargs=dict(width=64, height=64, camera_id=0)),
+    task_kwargs=dict(random_pick=True)
+)
 
 def worker(worker_id, start, end):
     np.random.seed(worker_id+1)
     # Initialize environment
-    env_args = dict(
-        domain='rope_colored',
-        task='easy',
-        max_path_length=10,
-        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
-                                  render_kwargs=dict(width=64, height=64, camera_id=0)),
-        task_kwargs=dict(random_pick=True)
-    )
     env = DMControlEnv(**env_args)
     if worker_id == 0:
         pbar = tqdm(total=end - start)
@@ -80,6 +81,9 @@ if __name__ == '__main__':
     root = join('data', 'rope_data')
     if not exists(root):
         os.makedirs(root)
+
+    with open(join(root, 'env_args.json'), 'w') as f:
+        json.dump(env_args, f)
 
     n_trajectories = 2500
     n_neg_samples = 5

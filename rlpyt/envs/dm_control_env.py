@@ -189,6 +189,9 @@ class DMControlEnv(Env):
             self._env.step(np.zeros(self.action_space.shape))
             self._step_count = state[1]
 
+    def get_geoms(self):
+        return self._env.task.get_geoms(self._env.physics)
+
     @property
     def spaces(self):
         return EnvSpaces(
