@@ -10,14 +10,28 @@ import numpy as np
 import imageio
 import multiprocessing as mp
 
-env_args = dict(
-    domain='rope_colored',
-    task='easy',
-    max_path_length=10,
-    pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
-                              render_kwargs=dict(width=64, height=64, camera_id=0)),
-    task_kwargs=dict(random_pick=True)
-)
+mode = 'cloth'
+
+if mode == 'rope':
+    env_args = dict(
+        domain='rope_colored',
+        task='easy',
+        max_path_length=10,
+        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
+                                  render_kwargs=dict(width=64, height=64, camera_id=0)),
+        task_kwargs=dict(random_pick=True)
+    )
+elif mode == 'cloth':
+    env_args = dict(
+         domain='cloth_colored',
+         task='easy',
+         max_path_length=10,
+         pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False,
+                                   render_kwargs=dict(width=64, height=64, camera_id=0)),
+         task_kwargs=dict(random_pick=True)
+    )
+else:
+    raise Exception('Invalid mode', mode)
 
 def worker(worker_id, start, end):
     np.random.seed(worker_id+1)
@@ -44,14 +58,14 @@ def worker(worker_id, start, end):
                 str_k = str(k + 1) # start at 1
 
                 a = env.action_space.sample()
-                a = a / np.linalg.norm(a) * np.sqrt(2)
+                a = a / np.linalg.norm(a)
                 actions_t.append(np.concatenate((o.location[:2], a))) # need to add before b/c o is replaced
                 o, _, terminal, info = env.step(a)
 
                 imageio.imwrite(join(run_folder, 'img_{}_{}.png'.format(str_t.zfill(2), str_k.zfill(3))), o.pixels.astype('uint8'))
 
                 env.set_state(saved_state, ignore_step=False)
-                env.step(np.array([0, 0]))
+                env.step(np.zeros(env.action_space.sample().shape))
                 env._step_count -= 1
                 o = env.get_obs()
 
@@ -78,15 +92,15 @@ def worker(worker_id, start, end):
 
 if __name__ == '__main__':
     start = time.time()
-    root = join('data', 'rope_data')
+    root = join('data', '{}_data'.format(mode))
     if not exists(root):
         os.makedirs(root)
 
     with open(join(root, 'env_args.json'), 'w') as f:
         json.dump(env_args, f)
 
-    n_trajectories = 2500
-    n_neg_samples = 5
+    n_trajectories = 15000
+    n_neg_samples = 0
     n_chunks = mp.cpu_count()
     partition_size = math.ceil(n_trajectories / n_chunks)
     args_list = []
