@@ -10,13 +10,18 @@ import numpy as np
 import imageio
 import multiprocessing as mp
 
-mode = 'cloth'
+mode = 'pointmass'
+n_samples = 125000
+n_neg_samples = 0
+max_path_length = 50
+n_trajectories = math.ceil(n_samples / (max_path_length + 1 + max_path_length * n_neg_samples))
+print(n_trajectories, 'trajectories')
 
 if mode == 'rope':
     env_args = dict(
         domain='rope_colored',
         task='easy',
-        max_path_length=10,
+        max_path_length=max_path_length,
         pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
                                   render_kwargs=dict(width=64, height=64, camera_id=0)),
         task_kwargs=dict(random_pick=True)
@@ -25,10 +30,18 @@ elif mode == 'cloth':
     env_args = dict(
          domain='cloth_colored',
          task='easy',
-         max_path_length=10,
+         max_path_length=max_path_length,
          pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False,
                                    render_kwargs=dict(width=64, height=64, camera_id=0)),
          task_kwargs=dict(random_pick=True)
+    )
+elif mode == 'pointmass':
+    env_args = dict(
+        domain='point_mass_vel',
+        task='easy',
+        max_path_length=max_path_length,
+        pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False,
+                                  render_kwargs=dict(width=64, height=64, camera_id=0)),
     )
 else:
     raise Exception('Invalid mode', mode)
@@ -58,8 +71,10 @@ def worker(worker_id, start, end):
                 str_k = str(k + 1) # start at 1
 
                 a = env.action_space.sample()
-                a = a / np.linalg.norm(a)
-                actions_t.append(np.concatenate((o.location[:2], a))) # need to add before b/c o is replaced
+                if mode == 'cloth' or mode == 'rope':
+                    actions_t.append(np.concatenate((o.location[:2], a))) # need to add before b/c o is replaced
+                else:
+                    actions_t.append(a)
                 o, _, terminal, info = env.step(a)
 
                 imageio.imwrite(join(run_folder, 'img_{}_{}.png'.format(str_t.zfill(2), str_k.zfill(3))), o.pixels.astype('uint8'))
@@ -70,8 +85,10 @@ def worker(worker_id, start, end):
                 o = env.get_obs()
 
             a = env.action_space.sample()
-            a = a / np.linalg.norm(a)
-            actions_t.insert(0, np.concatenate((o.location[:2], a)))
+            if mode == 'cloth' or mode == 'rope':
+                actions_t.insert(0, np.concatenate((o.location[:2], a)))
+            else:
+                actions_t.insert(0, a)
             o, _, terminal, info = env.step(a)
             env_states.append(env.get_state())
 
@@ -99,8 +116,6 @@ if __name__ == '__main__':
     with open(join(root, 'env_args.json'), 'w') as f:
         json.dump(env_args, f)
 
-    n_trajectories = 15000
-    n_neg_samples = 0
     n_chunks = mp.cpu_count()
     partition_size = math.ceil(n_trajectories / n_chunks)
     args_list = []
