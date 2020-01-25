@@ -245,7 +245,7 @@ config = dict(
         max_path_length=120,
         pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
                                   render_kwargs=dict(width=64, height=64, camera_id=0)),
-        task_kwargs=dict(random_location=True, pixels_only=True) # to not return positions and only pick location
+        task_kwargs=dict(random_location=True, pixels_only=True, train_mode=True) # to not return positions and only pick location
     ),
 )
 configs["sac_pixels_cloth_corner"] = config
