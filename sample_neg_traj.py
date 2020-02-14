@@ -10,11 +10,12 @@ import numpy as np
 import imageio
 import multiprocessing as mp
 
-mode = 'pointmass'
-n_samples = 125000
+mode = 'cloth'
+n_samples = 200000
 n_neg_samples = 0
 max_path_length = 50
 n_trajectories = math.ceil(n_samples / (max_path_length + 1 + max_path_length * n_neg_samples))
+n_trajectories = 10
 print(n_trajectories, 'trajectories')
 
 if mode == 'rope':
@@ -28,7 +29,7 @@ if mode == 'rope':
     )
 elif mode == 'cloth':
     env_args = dict(
-         domain='cloth_colored',
+         domain='cloth_grey',
          task='easy',
          max_path_length=max_path_length,
          pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False,
