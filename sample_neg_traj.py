@@ -10,11 +10,12 @@ import numpy as np
 import imageio
 import multiprocessing as mp
 
-mode = 'rope'
+mode = 'cloth'
 n_samples = 250000
-n_neg_samples = 5
-max_path_length = 10
+n_neg_samples = 0
+max_path_length = 50
 use_dr = True
+init_flat = True
 n_trajectories = math.ceil(n_samples / (max_path_length + 1 + max_path_length * n_neg_samples))
 print(n_trajectories, 'trajectories')
 
@@ -25,7 +26,7 @@ if mode == 'rope':
         max_path_length=max_path_length,
         pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False, # to not take away non pixel obs
                                   render_kwargs=dict(width=64, height=64, camera_id=0)),
-        task_kwargs=dict(random_pick=True, use_dr=use_dr)
+        task_kwargs=dict(random_pick=True, use_dr=use_dr, init_flat=init_flat)
     )
 elif mode == 'cloth':
     env_args = dict(
@@ -34,7 +35,7 @@ elif mode == 'cloth':
          max_path_length=max_path_length,
          pixel_wrapper_kwargs=dict(observation_key='pixels', pixels_only=False,
                                    render_kwargs=dict(width=64, height=64, camera_id=0)),
-         task_kwargs=dict(random_pick=True, use_dr=use_dir)
+         task_kwargs=dict(random_pick=True, use_dr=use_dr, init_flat=init_flat)
     )
 elif mode == 'pointmass':
     env_args = dict(
