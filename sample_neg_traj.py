@@ -10,14 +10,14 @@ import numpy as np
 import imageio
 import multiprocessing as mp
 
-mode = 'cloth'
+mode = 'rope'
 n_samples = 250000
-n_neg_samples = 0
-max_path_length = 50
-use_dr = True
+n_neg_samples = 5
+max_path_length = 10
+use_dr = False
 init_flat = True
 n_trajectories = math.ceil(n_samples / (max_path_length + 1 + max_path_length * n_neg_samples))
-print(n_trajectories, 'trajectories')
+print(n_trajectories, 'trajectories', 'use_dr', use_dr, 'init_flat', init_flat)
 
 if mode == 'rope':
     env_args = dict(
@@ -111,7 +111,8 @@ def worker(worker_id, start, end):
 
 if __name__ == '__main__':
     start = time.time()
-    root = join('data', '{}_data'.format(mode))
+    name = f'{mode}_flat_{init_flat}_dr_{use_dr}'
+    root = join('data', name)
     if not exists(root):
         os.makedirs(root)
 
