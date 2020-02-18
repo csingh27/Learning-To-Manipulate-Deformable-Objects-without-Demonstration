@@ -10,12 +10,15 @@ import numpy as np
 import imageio
 import multiprocessing as mp
 
-mode = 'rope'
+import sys
+use_dr, init_flat = sys.argv[1], sys.argv[2]
+use_dr = use_dr == 'True'
+init_flat = init_flat == 'True'
+
+mode = 'cloth'
 n_samples = 250000
-n_neg_samples = 5
-max_path_length = 10
-use_dr = False
-init_flat = True
+n_neg_samples = 0
+max_path_length = 50
 n_trajectories = math.ceil(n_samples / (max_path_length + 1 + max_path_length * n_neg_samples))
 print(n_trajectories, 'trajectories', 'use_dr', use_dr, 'init_flat', init_flat)
 
