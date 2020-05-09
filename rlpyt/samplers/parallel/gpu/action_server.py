@@ -14,7 +14,6 @@ class ActionServer:
     def serve_actions(self, itr):
         obs_ready, act_ready = self.sync.obs_ready, self.sync.act_ready
         step_np, agent_inputs = self.step_buffer_np, self.agent_inputs
-
         for t in range(self.batch_spec.T):
             for b in obs_ready:
                 b.acquire()  # Workers written obs and rew, first prev_act.
@@ -75,7 +74,7 @@ class ActionServer:
                 # assert not w.acquire(block=False)  # Debug check.
                 w.release()
             if self.sync.stop_eval.value:
-                logger.log("Evaluation reach max num trajectories "
+                logger.log("Evaluation reached max num trajectories "
                     f"({self.eval_max_trajectories}).")
                 break
         if t == self.eval_max_T - 1 and self.eval_max_trajectories is not None:

@@ -53,8 +53,8 @@ class ParallelSamplerBase(BaseSampler):
                 env_ranks=env_ranks)
         else:
             env = self.EnvCls(**self.env_kwargs)
-            env.reset()
-            env.step(env.action_space.sample())
+            # env.reset()
+            # env.step(env.action_space.sample())
             self._agent_init(agent, env.spaces, global_B=global_B,
                              env_ranks=env_ranks)
         examples = self._build_buffers(self.EnvCls, self.env_kwargs, bootstrap_value)

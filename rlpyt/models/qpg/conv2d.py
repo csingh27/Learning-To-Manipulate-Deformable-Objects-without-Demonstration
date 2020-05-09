@@ -47,7 +47,7 @@ class PiConvModel(torch.nn.Module):
         self._obs_ndim = 3
         self._action_size = action_size
         self._image_shape = observation_shape.pixels
-        print('observation_shape', observation_shape)
+        # print('observation_shape', observation_shape)
 
         self.preprocessor = get_preprocessor('image')
 
@@ -256,7 +256,7 @@ class GumbelPiConvModel(torch.nn.Module):
         self._action_size = action_size
         self._image_shape = observation_shape.pixels
 
-        print('observation shape', observation_shape)
+        # print('observation shape', observation_shape)
 
         self.preprocessor = get_preprocessor('image')
 
