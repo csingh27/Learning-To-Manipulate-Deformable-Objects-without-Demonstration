@@ -34,14 +34,14 @@ def build_and_train(slot_affinity_code, log_dir, run_ID, config_key):
         state_keys = config.get('state_keys', None)
         init_namedtuples(info_keys=info_keys, state_keys=state_keys)
 
-    eval_env = config['env'].copy()
-    eval_env['task_kwargs']['train_mode'] = False
+#     eval_env = config['env'].copy()
+#     eval_env['task_kwargs']['train_mode'] = False
 
     sampler = CpuSampler(
         EnvCls=DMControlEnv,
         env_kwargs=config["env"],
         CollectorCls=CpuResetCollector,
-        eval_env_kwargs=config["eval_env"],
+        eval_env_kwargs=config["env"],
         **config["sampler"]
     )
     algo = SAC(optim_kwargs=config["optim"], **config["algo"])
