@@ -14,12 +14,14 @@ def build_samples_buffer(agent, EnvCls, env_kwargs, batch_spec, bootstrap_value=
     affect settings in master before forking workers (e.g. torch num_threads
     (MKL) may be set at first forward computation.)"""
 
+    env = EnvCls(**env_kwargs)
+
     if examples is None:
         if subprocess:
             mgr = mp.Manager()
             examples = mgr.dict()  # Examples pickled back to master.
             w = mp.Process(target=get_example_outputs,
-                args=(agent, EnvCls, env_kwargs, examples, subprocess))
+                args=(agent, env, EnvCls, env_kwargs, examples, subprocess))
             w.start()
             w.join()
         else:
@@ -57,13 +59,12 @@ def build_samples_buffer(agent, EnvCls, env_kwargs, batch_spec, bootstrap_value=
     return samples_pyt, samples_np, examples
 
 
-def get_example_outputs(agent, EnvCls, env_kwargs, examples, subprocess=False):
+def get_example_outputs(agent, env, EnvCls, env_kwargs, examples, subprocess=False):
     """Do this in a sub-process to avoid setup conflict in master/workers (e.g.
     MKL)."""
     if subprocess:  # i.e. in subprocess.
         import torch
         torch.set_num_threads(1)  # Some fix to prevent MKL hang.
-    env = EnvCls(**env_kwargs)
     o = env.reset()
     a = env.action_space.sample()
     o, r, d, env_info = env.step(a)

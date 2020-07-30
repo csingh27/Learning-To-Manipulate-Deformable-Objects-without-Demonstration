@@ -34,12 +34,13 @@ def convert_dm_control_to_rlpyt_space(dm_control_space):
     To handle dm_control observation_specs as inputs, we check the following
     input types in order to enable recursive calling on each nested item.
     """
+    # print("Control space: ", dm_control_space)
     if isinstance(dm_control_space, BoundedArray):
         rlpyt_box = Box(
             low=dm_control_space.minimum,
             high=dm_control_space.maximum,
             shape=None,
-            dtype=dm_control_space.dtype)
+            dtype=np.float32) # dm_control_space.dtype
         assert rlpyt_box.shape == dm_control_space.shape, (
             (rlpyt_box.shape, dm_control_space.shape))
         return rlpyt_box
@@ -49,8 +50,8 @@ def convert_dm_control_to_rlpyt_space(dm_control_space):
         return Box(
             low=-float("inf"),
             high=float("inf"),
-            shape=dm_control_space.shape,
-            dtype=dm_control_space.dtype)
+            shape=dm_control_space.shape or (1,),
+            dtype=np.float32) # dm_control_space.dtype
     elif isinstance(dm_control_space, OrderedDict):
         global State
         if State is None:
@@ -63,18 +64,18 @@ def convert_dm_control_to_rlpyt_space(dm_control_space):
 EnvInfo = None
 Observation = None
 
-def init_namedtuples(info_keys=None, state_keys=None):
-    global EnvInfo, Observation, State
+# def init_namedtuples(info_keys=None, state_keys=None):
+#     global EnvInfo, Observation, State
 
-    if info_keys is None:
-        info_keys = ['traj_done']
+#     if info_keys is None:
+#         info_keys = ['traj_done']
 
-    if state_keys is None:
-        state_keys = ['pixels']
+#     if state_keys is None:
+#         state_keys = ['pixels']
 
-    EnvInfo = namedtuple('EnvInfo', info_keys)
-    Observation = namedarraytuple('Observation', state_keys)
-    State = namedtuple('State', state_keys)
+#     EnvInfo = namedtuple('EnvInfo', info_keys)
+#     Observation = namedarraytuple('Observation', state_keys)
+#     State = namedtuple('State', state_keys)
 
 class DMControlEnv(Env):
 
@@ -113,17 +114,20 @@ class DMControlEnv(Env):
                 " check the implemenation.".format(action_space))
         self._action_space = action_space
 
+        time_step = env.reset()
+        global Observation, EnvInfo
+        Observation = namedarraytuple("Observation", list(time_step.observation.keys()))
+        EnvInfo = namedtuple("EnvInfo", ['traj_done'])
+
         self._step_count = 0
 
     def reset(self):
         self._step_count = 0
         time_step = self._env.reset()
-        observation = self._filter_observation(time_step.observation)
+        # observation = self._filter_observation(time_step.observation)
 
-        global Observation
-        if Observation is None:
-            Observation = namedarraytuple("Observation", list(observation.keys()))
-        observation = Observation(**{k: v for k, v in observation.items()
+        # print("obs: ", time_step.observation, time_step.observation.items())
+        observation = Observation(**{k: v.astype(np.float32).reshape(-1) for k, v in time_step.observation.items()
                                      if k in self._observation_keys})
         return observation
 
@@ -131,26 +135,20 @@ class DMControlEnv(Env):
         time_step = self._env.step(action)
         reward = time_step.reward
         terminal = time_step.last()
-        info = time_step.info
-        info.update({
-            key: value
-            for key, value in time_step.observation.items()
-            if key not in self._observation_keys
-        })
-        observation = self._filter_observation(time_step.observation)
+        info = time_step.info if hasattr(time_step, 'info') else {}
+        # info.update({
+        #     key: value
+        #     for key, value in time_step.observation.items()
+        #     if key not in self._observation_keys
+        # })
+        # observation = self._filter_observation(time_step.observation)
 
         self._step_count += 1
         info['traj_done'] = self._step_count >= self._max_path_length
 
-        global EnvInfo
-        if EnvInfo is None:
-            EnvInfo = namedtuple("EnvInfo", list(info.keys()))
         info = EnvInfo(**{k: v for k, v in info.items() if k in EnvInfo._fields})
 
-        global Observation
-        if Observation is None:
-            Observation = namedarraytuple("Observation", list(observation.keys()))
-        observation = Observation(**{k: v.copy() for k, v in observation.items()
+        observation = Observation(**{k: v.astype(np.float32).reshape(-1) for k, v in time_step.observation.items()
                                      if k in self._observation_keys})
 
         return EnvStep(observation, reward, terminal, info)

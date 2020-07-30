@@ -55,16 +55,17 @@ class PiMlpModel(torch.nn.Module):
             action_size,
             ):
         super().__init__()
-       # action_size = 3
+
+        # print("Obs shape:", observation_shape, np.sum(observation_shape))
         self._obs_ndim = 1
-        input_dim = int(np.sum(observation_shape))
+        self.input_dim = int(np.sum(observation_shape))
 
         # self._obs_ndim = len(observation_shape)
         # input_dim = int(np.prod(observation_shape))
 
         self._action_size = action_size
         self.mlp = MlpModel(
-            input_size=input_dim,
+            input_size=self.input_dim,
             hidden_sizes=hidden_sizes,
             output_size=action_size * 2,
         )

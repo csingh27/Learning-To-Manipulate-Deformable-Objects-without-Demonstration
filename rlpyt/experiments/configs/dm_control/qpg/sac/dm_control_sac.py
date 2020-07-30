@@ -4,6 +4,47 @@ import copy
 configs = dict()
 
 config = dict(
+    # state_keys=['position', 'velocity'],
+    # info_keys=['position', 'velocity', 'traj_done'],
+    agent=dict(
+        q_model_kwargs=dict(hidden_sizes=[256, 256]),
+        model_kwargs=dict(hidden_sizes=[256, 256]),
+    ),
+    algo=dict(
+        discount=0.99,
+        batch_size=1024,
+        target_update_tau=0.005,
+        target_update_interval=1,
+        learning_rate=6e-4,
+        reparameterize=True,
+        policy_output_regularization=0.0,
+        reward_scale=1,
+        replay_ratio=128,
+    ),
+    model=dict(),
+    optim=dict(),
+    runner=dict(
+        n_steps=1e6,
+        log_interval_steps=1e5,
+    ),
+    sampler=dict(
+        batch_T=1,
+        batch_B=64,
+        max_decorrelation_steps=0,
+        eval_n_envs=10,
+        eval_max_steps=20000,
+        eval_max_trajectories=50,
+    ),
+    env=dict(
+        domain='cartpole',
+        task='swingup',
+        max_path_length=1000,
+    ),
+)
+
+configs["general_state"] = config
+
+config = dict(
     agent=dict(
         q_model_kwargs=dict(hidden_sizes=[256, 256]),
         model_kwargs=dict(hidden_sizes=[256, 256]),
