@@ -182,7 +182,7 @@ class SacAgent(BaseAgent):
                 locations = np.arange(25).astype('float32')
                 locations = locations[:, None]
                 locations = np.tile(locations, (1, 50)) / 24
-            elif self._max_q_eval_mode == 'state_cloth_corner':
+            elif self._max_q_eval_mode == 'state_cloth_corner' or self._max_q_eval_mode == 'pixel_cloth_corner':
                 locations = np.array([[1, 0, 0, 0], [0, 1, 0, 0],
                                      [0, 0, 1, 0], [0, 0, 0, 1]],
                                      dtype='float32')
@@ -247,8 +247,11 @@ class SacAgent(BaseAgent):
             actual_idxs = indices[sampled_idx]
             #actual_idxs += (torch.arange(batch_size) * n_locations).to(self.device)
 
-            location = locations[actual_idxs][:, :1]
-            location = (location - 0.5) / 0.5
+            if 'corner' in self._max_q_eval_mode:
+                location = locations[actual_idxs][:, :4]
+            else:
+                location = locations[actual_idxs][:, :1]
+                location = (location - 0.5) / 0.5
             delta = torch.tanh(mean[actual_idxs])
             action = torch.cat((location, delta), dim=-1)
 

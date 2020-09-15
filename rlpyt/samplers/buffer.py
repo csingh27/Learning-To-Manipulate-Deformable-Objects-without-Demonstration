@@ -65,7 +65,8 @@ def get_example_outputs(agent, EnvCls, env_kwargs, examples, subprocess=False):
         torch.set_num_threads(1)  # Some fix to prevent MKL hang.
     env = EnvCls(**env_kwargs)
     o = env.reset()
-    a = env.action_space.sample()
+    #a = env.action_space.sample()
+    a = np.zeros(7)
     o, r, d, env_info = env.step(a)
     r = np.asarray(r, dtype="float32")  # Must match torch float dtype here.
     agent.reset()
