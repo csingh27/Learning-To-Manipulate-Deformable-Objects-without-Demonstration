@@ -65,7 +65,22 @@ print(sim.data.qpos)
 • sudo python3 setup.py install  
 • pip3 install dm_env  
   
-Install the original rlpyt environment  
+5) Install the original rlpyt environment  
+
+• git clone https://github.com/wilson1yan/rlpyt.git  
+• conda env create -f linux_cuda9.yml  
+• alias rlpyt="source activate rlpyt; cd /home/chandandeep/.mujoco/rlpyt"  
+• pip install -e .  
+• conda activate rlpyt  
+• Update location of /dm_control/qpg/sac/train/dm_control_sac.py in the launch file “launch_dm_control_sac_pixels_cloth_corner.py” in (/home/chandandeep/.mujoco/rlpyt/rlpyt/experiments/scripts/dm_control/qpg/sac/launch)  
+• Do the same for this location /home/chandandeep/.mujoco/rlpyt/rlpyt/experiments/scripts/mujoco/qpg/train for the file mujoco_sac_serial.py  
+• export MJLIB_PATH=/home/chandandeep/.mujoco/mujoco200_linux/bin/libmujoco200.so  
+• pip3 install alphashape  
+• python3 launch_dm_control_sac_state_cloth_point.py  
+• cd /home/chandandeep/anaconda3/envs/rlpyt/lib/python3.7/site-packages/dm_control/mujoco/wrapper/  
+• _REGISTERED = True  
+• cd /home/chandandeep/anaconda3/envs/rlpyt/lib/python3.7/multiprocessing/  
+
 
 ## Running
 
